@@ -21,7 +21,7 @@ canvas{width:960px;height:540px;outline:none;display:block;cursor:crosshair}
 // =====================================================================
 //  ASCHENPFAD – 2D Souls-like  (v0.6)
 // =====================================================================
-const VW = 960, VH = 540, T = 32, W = 424, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
+const VW = 960, VH = 540, T = 32, W = 462, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const approach = (v, t, d) => v < t ? Math.min(v + d, t) : Math.max(v - d, t);
 const lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
@@ -412,10 +412,12 @@ const BONFIRES = [
   { x: 115 * T + 16, y: 16 * T, name: 'Kapellen-Leuchtfeuer' },
   { x: 201 * T + 16, y: 16 * T, name: 'Katakomben-Leuchtfeuer' },
   { x: 303 * T + 16, y: 16 * T, name: 'Zitadellen-Leuchtfeuer' },
+  { x: 443 * T + 16, y: 16 * T, name: 'Die Zuflucht' },
 ];
+const HUB = 4, SMITH_X = 432 * T + 16, MERCH_X = 452 * T + 16, PORTAL_X = 458 * T + 16;
 const FOG2_X = 392, ARENA2_X0 = 393 * T, KDOOR_X = 283;
 const TORCHES = [[17, 13], [29, 12], [41, 13], [47, 13], [64, 12], [78, 11], [84, 9], [107, 9], [113, 12], [125, 12], [137, 8], [151, 7], [161, 12], [171, 7], [181, 12], [194, 12],
-  [306, 12], [318, 9], [330, 12], [344, 8], [361, 12], [371, 8], [383, 12], [390, 11], [396, 9], [420, 9]]
+  [306, 12], [318, 9], [330, 12], [344, 8], [361, 12], [371, 8], [383, 12], [390, 11], [396, 9], [420, 9], [428, 10], [438, 10], [448, 10], [455, 10]]
   .map(([x, y]) => ({ x: x * T + 16, y: y * T + 16, c: [255, 140, 60], f: ['200,60,20', '255,140,40', '255,235,160'] }))
   .concat([[204, 11], [214, 11], [229, 10], [244, 8], [252, 5], [261, 13], [268, 8], [279, 8], [288, 9], [297, 6]]
   .map(([x, y]) => ({ x: x * T + 16, y: y * T + 16, c: [110, 255, 150], f: ['30,140,60', '80,230,120', '200,255,210'] })));
@@ -424,6 +426,7 @@ const ITEM_DEFS = [
   { x: 142 * T, y: 13 * T, souls: 220 }, { x: 186 * T, y: 16 * T, souls: 320 }, { x: 137.6 * T, y: 11 * T, souls: 180 },
   { x: 220 * T, y: 12 * T, souls: 300 }, { x: 235.5 * T, y: 13 * T, souls: 260 }, { x: 260 * T, y: 16 * T, souls: 350 }, { x: 292 * T, y: 10 * T, souls: 400 },
   { x: 314 * T, y: 11 * T, souls: 420 }, { x: 351.5 * T, y: 14 * T, souls: 450 }, { x: 373 * T, y: 12 * T, souls: 500 }, { x: 388 * T, y: 16 * T, souls: 600 },
+  { x: 189 * T, y: 16 * T, souls: 0, stones: 1 }, { x: 280 * T, y: 16 * T, souls: 0, stones: 2 }, { x: 381 * T, y: 16 * T, souls: 0, stones: 2 }, { x: 146.5 * T, y: 10 * T, souls: 0, stones: 1 },
 ];
 const CHEST_DEFS = [
   { x: 148 * T + 16, y: 10 * T, item: 'weapon:axe' }, { x: 174 * T + 4, y: 10 * T, item: 'flask' },
@@ -446,13 +449,14 @@ const SIGNS = [
   { x: 265 * T, y: 16 * T, text: 'Der Grabwächter hütet den Turmschlüssel.' },
   { x: 309 * T, y: 16 * T, text: 'Feuertöpfe! Nicht stehen bleiben.' },
   { x: 389 * T, y: 16 * T, text: 'Die Glutpriesterin wartet. Ihre Flammen folgen dir.' },
+  { x: 440 * T, y: 16 * T, text: 'Die Zuflucht. Schmied links, Händlerin rechts, das Weltentor führt hinaus.' },
 ];
 const PITS = [[120, 123], [139, 147], [176, 179], [233, 237], [322, 325], [348, 358]];
 const BACKWALLS = [[13, 11, 44, 15]];
 const world = {};
 function initWorld() {
   Object.assign(world, {
-    doorOpen: false, bossDefeated: false, lit: [false, false, false, false], bonfire: 0, stain: null, flaskBonus: 0,
+    doorOpen: false, bossDefeated: false, lit: [false, false, false, false, true], bonfire: HUB, wlevel: {}, stones: 0, boughtFlask: false, stain: null, flaskBonus: 0,
     weapons: ['sword'], armors: ['wanderer'], rings: [], playTime: 0,
     gateOpen: false, towerOpen: false, hasKey: false, bruteDead: false, boss2Defeated: false,
     items: ITEM_DEFS.map(d => ({ ...d, taken: false })), chests: CHEST_DEFS.map(d => ({ ...d, opened: false })),
@@ -493,7 +497,7 @@ function buildMap() {
   f(351, 14, 352, 14, '#'); f(355, 13, 356, 13, '#');
   f(363, 13, 364, 13, '#'); f(366, 10, 369, 10, '#'); f(372, 12, 375, 12, '#'); f(379, 15, 380, 15, '^');
   f(FOG2_X, 1, FOG2_X, 11, '#'); f(FOG2_X, 12, FOG2_X, 15, 'Y');
-  f(W - 1, 0, W - 1, 16, '#');
+  f(423, 0, 426, 16, '#'); f(427, 1, 460, 3, '#'); f(W - 1, 0, W - 1, 16, '#');
   SPIKES = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (map[y][x] === '^') SPIKES.push([x, y]);
   renderTiles();
 }
@@ -531,7 +535,7 @@ function renderTiles() {
   for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
     const c = map[ty][tx], px = tx * T, py = ty * T;
     if (c === '#') {
-      x.fillStyle = tx > 299 ? patCitadel : tx > 196 ? patCrypt : tx > 111 ? patChapel : patRuins; x.fillRect(px, py, T, T);
+      x.fillStyle = tx > 423 ? patRuins : tx > 299 ? patCitadel : tx > 196 ? patCrypt : tx > 111 ? patChapel : patRuins; x.fillRect(px, py, T, T);
       if (!sol(tx, ty - 1)) {
         x.fillStyle = 'rgba(225,230,245,0.18)'; x.fillRect(px, py, T, 2);
         x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(px, py + 2, T, 1);
@@ -692,7 +696,7 @@ function updateWeather(dt) {
   if (thunderT > 0) { thunderT -= dt; if (thunderT <= 0) { sfx('thunder'); shake = Math.max(shake, 2); } }
   lightning = Math.max(0, lightning - dt * 2.2);
 }
-const ZONES = [['ruins', -1e9, 110 * T], ['chapel', 110 * T, 196.5 * T], ['crypt', 196.5 * T, 300 * T], ['citadel', 300 * T, 1e9]];
+const ZONES = [['ruins', -1e9, 110 * T], ['chapel', 110 * T, 196.5 * T], ['crypt', 196.5 * T, 300 * T], ['citadel', 300 * T, 424.5 * T], ['hub', 424.5 * T, 1e9]];
 function areaW() {
   const cx = cam.x + VW / 2, r = {}; let sum = 0;
   for (const [n, a, b] of ZONES) { const w = smooth(a - 4 * T, a + 4 * T, cx) * (1 - smooth(b - 4 * T, b + 4 * T, cx)); r[n] = w; sum += w; }
@@ -707,20 +711,20 @@ const P = { w: 22, h: 50, souls: 0, weapon: 'sword', armor: 'wanderer', ring: nu
 const stats = { vit: 0, end: 0, str: 0 };
 const WEAPONS = {
   sword: { name: 'Langschwert', len: 34, wid: 4, col: '#c9ccd6', axe: false, desc: 'Ausgewogen und schnell.',
-    light: { wind: 0.11, act: 0.10, rec: 0.26, dmg: 20, reach: 52, hgt: 40, push: 140, poise: 1, lunge: 130, cost: 16 },
-    heavy: { wind: 0.38, act: 0.12, rec: 0.38, dmg: 46, reach: 64, hgt: 50, push: 280, poise: 3, lunge: 220, cost: 30, heavy: true } },
+    light: { wind: 0.11, act: 0.10, rec: 0.26, dmg: 20, reach: 52, hgt: 40, push: 140, poise: 1, lunge: 130, cost: 21 },
+    heavy: { wind: 0.38, act: 0.12, rec: 0.38, dmg: 46, reach: 64, hgt: 50, push: 280, poise: 3, lunge: 220, cost: 39, heavy: true } },
   axe: { name: 'Großaxt', len: 40, wid: 5, col: '#a4aab4', axe: true, desc: 'Langsam, brutal, bricht Deckungen.',
-    light: { wind: 0.22, act: 0.12, rec: 0.36, dmg: 34, reach: 62, hgt: 48, push: 220, poise: 2, lunge: 110, cost: 24 },
-    heavy: { wind: 0.58, act: 0.14, rec: 0.50, dmg: 82, reach: 76, hgt: 62, push: 360, poise: 4, lunge: 170, cost: 40, heavy: true } },
+    light: { wind: 0.22, act: 0.12, rec: 0.36, dmg: 34, reach: 62, hgt: 48, push: 220, poise: 2, lunge: 110, cost: 31 },
+    heavy: { wind: 0.58, act: 0.14, rec: 0.50, dmg: 82, reach: 76, hgt: 62, push: 360, poise: 4, lunge: 170, cost: 52, heavy: true } },
   dagger: { name: 'Totengräberdolch', len: 20, wid: 3, col: '#d0d4dc', axe: false, desc: 'Blitzschnell. Kritische Treffer ×1,5.',
-    light: { wind: 0.07, act: 0.08, rec: 0.18, dmg: 13, reach: 42, hgt: 36, push: 90, poise: 1, lunge: 110, cost: 10, critMul: 1.5 },
-    heavy: { wind: 0.2, act: 0.1, rec: 0.26, dmg: 28, reach: 48, hgt: 40, push: 160, poise: 2, lunge: 260, cost: 20, heavy: true, critMul: 1.5 } },
+    light: { wind: 0.07, act: 0.08, rec: 0.18, dmg: 13, reach: 42, hgt: 36, push: 90, poise: 1, lunge: 110, cost: 13, critMul: 1.5 },
+    heavy: { wind: 0.2, act: 0.1, rec: 0.26, dmg: 28, reach: 48, hgt: 40, push: 160, poise: 2, lunge: 260, cost: 26, heavy: true, critMul: 1.5 } },
   spear: { name: 'Wächterspeer', len: 52, wid: 3, col: '#b8bcc6', axe: false, desc: 'Große Reichweite. Schwerer Angriff ist ein Sturmangriff.',
-    light: { wind: 0.14, act: 0.12, rec: 0.28, dmg: 22, reach: 82, hgt: 26, push: 160, poise: 1, lunge: 150, cost: 18 },
-    heavy: { wind: 0.34, act: 0.2, rec: 0.42, dmg: 50, reach: 90, hgt: 30, push: 300, poise: 3, lunge: 420, cost: 32, heavy: true } },
+    light: { wind: 0.14, act: 0.12, rec: 0.28, dmg: 22, reach: 82, hgt: 26, push: 160, poise: 1, lunge: 150, cost: 23 },
+    heavy: { wind: 0.34, act: 0.2, rec: 0.42, dmg: 50, reach: 90, hgt: 30, push: 300, poise: 3, lunge: 420, cost: 42, heavy: true } },
   greatsword: { name: 'Großschwert der Asche', len: 50, wid: 7, col: '#b0a8a0', axe: false, desc: 'Gewaltig. Langsam, aber trifft weit und hart.',
-    light: { wind: 0.27, act: 0.14, rec: 0.4, dmg: 40, reach: 80, hgt: 60, push: 260, poise: 3, lunge: 120, cost: 27 },
-    heavy: { wind: 0.62, act: 0.16, rec: 0.55, dmg: 96, reach: 90, hgt: 74, push: 420, poise: 5, lunge: 160, cost: 44, heavy: true } },
+    light: { wind: 0.27, act: 0.14, rec: 0.4, dmg: 40, reach: 80, hgt: 60, push: 260, poise: 3, lunge: 120, cost: 35 },
+    heavy: { wind: 0.62, act: 0.16, rec: 0.55, dmg: 96, reach: 90, hgt: 74, push: 420, poise: 5, lunge: 160, cost: 57, heavy: true } },
 };
 const ARMORS = {
   wanderer: { name: 'Wanderergewand', def: 0.08, poise: 0, weight: 1, desc: 'Leichtes Leder. Schnelle, weite Rolle.' },
@@ -740,9 +744,9 @@ const RINGS = {
 };
 const WEIGHT_NAMES = { 1: 'leicht', 2: 'mittel', 3: 'schwer' };
 const ROLLS = {
-  1: { sp: 390, dur: 0.48, ifr: [0.04, 0.36], cost: 24, move: 230 },
-  2: { sp: 350, dur: 0.52, ifr: [0.05, 0.33], cost: 27, move: 215 },
-  3: { sp: 285, dur: 0.62, ifr: [0.06, 0.29], cost: 32, move: 195 },
+  1: { sp: 390, dur: 0.48, ifr: [0.04, 0.36], cost: 30, move: 230 },
+  2: { sp: 350, dur: 0.52, ifr: [0.05, 0.33], cost: 34, move: 215 },
+  3: { sp: 285, dur: 0.62, ifr: [0.06, 0.29], cost: 40, move: 195 },
 };
 const LOOKS = {
   wanderer: { body: '#7e6a54', dark: '#55473a', legs: '#4a4036', head: 'hood', headCol: '#6a5a48', cape: '#5a4230', trim: '#9a8258' },
@@ -804,8 +808,8 @@ const lvlCost = () => Math.floor(90 * Math.pow(1.22, level() - 1));
 function recalcStats() {
   const A = ARMORS[P.armor];
   const rg = P.ring;
-  P.maxHp = Math.round((100 + stats.vit * 15) * (rg === 'vigor' ? 1.25 : 1)); P.maxSt = 90 + stats.end * 12 + (rg === 'stamina' ? 25 : 0);
-  P.dmgMul = (1 + stats.str * 0.12) * (rg === 'blade' ? 1.15 : 1); P.maxFlasks = 3 + world.flaskBonus;
+  P.maxHp = Math.round((100 + stats.vit * 15) * (rg === 'vigor' ? 1.25 : 1)); P.maxSt = 80 + stats.end * 10 + (rg === 'stamina' ? 25 : 0);
+  P.dmgMul = (1 + Math.min(stats.str, 10) * 0.07 + Math.max(0, stats.str - 10) * 0.025) * (rg === 'blade' ? 1.15 : 1); P.maxFlasks = 3 + world.flaskBonus;
   P.roll = ROLLS[A.weight]; P.stMul = (A.stRegen || 1) * (A.weight === 3 ? 0.9 : 1) * (rg === 'stamina' ? 1.12 : 1);
   P.def = Math.min(0.75, A.def + (rg === 'iron' ? 0.1 : 0)); P.poiseMax = A.poise + (rg === 'iron' ? 1 : 0);
   P.soulMul = (A.souls || 1) * (rg === 'soul' ? 1.25 : 1);
@@ -822,7 +826,7 @@ function resetPlayer() {
 }
 let buf = null, jumpBuf = 0;
 function setState(s) { P.state = s; P.t = 0; }
-function useSt(n) { P.st = Math.max(0, P.st - n); P.stDelay = 0.55; }
+function useSt(n) { P.st = Math.max(0, P.st - n); P.stDelay = 0.75; }
 
 function tryAction(mx) {
   const p = P, a = buf.a;
@@ -839,7 +843,7 @@ function tryAction(mx) {
   }
   if (a === 'parry') {
     if (!p.onGround) return;
-    buf = null; useSt(12); setState('parry'); sfx('swing'); return;
+    buf = null; useSt(16); setState('parry'); sfx('swing'); return;
   }
   buf = null;
   const d = WEAPONS[p.weapon][a]; useSt(d.cost); if (mx) p.face = mx; setState('attack'); p.atk = { d, hit: new Set(), lunged: false };
@@ -850,7 +854,7 @@ function updatePlayer(dt, I) {
   if (p.poiseT > 0) { p.poiseT -= dt; if (p.poiseT <= 0) p.poise = p.poiseMax; }
   const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
   if (p.stDelay > 0) p.stDelay -= dt;
-  else { const r = { free: 62, hurt: 62, heal: 18, block: 22 }[p.state]; if (r) p.st = Math.min(p.maxSt, p.st + r * p.stMul * dt); }
+  else { const r = { free: 40, hurt: 40, heal: 12, block: 14 }[p.state]; if (r) p.st = Math.min(p.maxSt, p.st + r * p.stMul * dt); }
   if (p.hpShow > p.hp) p.hpShow = Math.max(p.hp, p.hpShow - 70 * dt); else p.hpShow = p.hp;
   if (p.onGround) { p.coyote = 0.1; p.lastGround = { x: p.x + p.w / 2, y: p.y + p.h }; } else p.coyote -= dt;
   if (jumpBuf > 0) jumpBuf -= dt;
@@ -938,7 +942,7 @@ function updateCape(dt) {
 function playerHits(a) {
   const p = P, d = a.d;
   const hb = { x: p.face > 0 ? p.x + p.w - 4 : p.x - d.reach + 4, y: p.y + p.h / 2 - d.hgt / 2 - 4, w: d.reach, h: d.hgt };
-  const dmg = d.dmg * p.dmgMul;
+  const dmg = d.dmg * p.dmgMul * (1 + 0.08 * ((world.wlevel || {})[p.weapon] || 0));
   for (const e of enemies) { if (e.dead || a.hit.has(e)) continue; if (overlap(hb, e)) { a.hit.add(e); hurtEnemy(e, dmg, p.face, d); } }
   if (bossActive && !B.dead && !a.hit.has(B) && overlap(hb, B)) { a.hit.add(B); hurtBoss(dmg, p.face, d); }
   if (vActive && !V.dead && V.alpha > 0.5 && !a.hit.has(V) && overlap(hb, V)) { a.hit.add(V); hurtV(dmg, p.face, d); }
@@ -954,7 +958,7 @@ function hitPlayer(dmg, dir, kb, src = {}) {
   const heavyHit = dmg >= 36;
   dmg *= 1 - p.def;
   if (p.state === 'block' && facing) {
-    const cost = dmg * 1.5;
+    const cost = dmg * 2;
     sfx('block'); sparks(p.x + p.w / 2 + p.face * 12, p.y + 18, 8, '#ffd27a');
     if (p.st >= cost) {
       p.st -= cost; p.stDelay = 0.6; p.hp -= dmg * 0.1; p.vx = dir * kb * 0.45; shake = Math.max(shake, 3);
@@ -1012,7 +1016,7 @@ const ETYPES = {
     attacks: [{ wind: 0.38, act: 0.30, rec: 0.8, dmg: 16, range: 120 }] },
   bomber: { w: 22, h: 46, hp: 60, speed: 0, detect: 420, souls: 110, poiseMax: 0, kind: 'bomber',
     attacks: [{ wind: 0.9, act: 0.05, rec: 0.6, dmg: 26, range: 420 }] },
-  brute: { w: 38, h: 70, hp: 620, speed: 46, detect: 360, souls: 2000, poiseMax: 9, kind: 'melee', mini: true, name: 'Morn, der Grabwächter',
+  brute: { w: 38, h: 70, hp: 1700, speed: 50, detect: 360, souls: 1500, poiseMax: 12, kind: 'melee', mini: true, name: 'Morn, der Grabwächter',
     attacks: [
       { wind: 0.95, act: 0.18, rec: 0.9, dmg: 46, reach: 84, step: 140, up: -2.4, end: 1.2, range: 60, wave: true },
       { wind: 0.7, act: 0.22, rec: 0.75, dmg: 34, reach: 100, step: 220, up: -1.0, end: 1.6, range: 86 },
@@ -1023,29 +1027,30 @@ const ETYPES = {
 const SPAWNS = [
   { t: 'soldier', x: 23 * T, y: 10 * T }, { t: 'soldier', x: 32 * T, y: 10 * T }, { t: 'hound', x: 40 * T, y: 10 * T },
   { t: 'archer', x: 29 * T, y: 6 * T },
-  { t: 'soldier', x: 24 * T, y: 16 * T }, { t: 'hound', x: 37 * T, y: 16 * T },
+  { t: 'soldier', x: 24 * T, y: 16 * T }, 
   { t: 'soldier', x: 51 * T, y: 16 * T }, { t: 'hound', x: 57 * T, y: 16 * T }, { t: 'archer', x: 61 * T, y: 10 * T },
-  { t: 'soldier', x: 64 * T, y: 16 * T }, { t: 'knight', x: 72 * T, y: 16 * T }, { t: 'hound', x: 75 * T, y: 16 * T },
+  { t: 'soldier', x: 64 * T, y: 16 * T }, { t: 'knight', x: 72 * T, y: 16 * T }, 
   { t: 'knight', x: 127 * T, y: 16 * T }, { t: 'archer', x: 136 * T, y: 11 * T },
-  { t: 'hound', x: 152 * T, y: 16 * T }, { t: 'soldier', x: 155 * T, y: 16 * T },
+  { t: 'hound', x: 152 * T, y: 16 * T }, 
   { t: 'knight', x: 163 * T, y: 16 * T }, { t: 'archer', x: 172 * T, y: 10 * T },
-  { t: 'soldier', x: 183 * T, y: 16 * T }, { t: 'hound', x: 187 * T, y: 16 * T }, { t: 'knight', x: 191 * T, y: 16 * T },
+  { t: 'soldier', x: 183 * T, y: 16 * T }, { t: 'knight', x: 191 * T, y: 16 * T },
   // Katakomben
-  { t: 'soldier', x: 209 * T, y: 16 * T }, { t: 'bomber', x: 223 * T, y: 12 * T }, { t: 'hound', x: 222 * T, y: 16 * T }, { t: 'soldier', x: 227 * T, y: 16 * T },
-  { t: 'hound', x: 231 * T, y: 16 * T }, { t: 'knight', x: 240 * T, y: 16 * T }, { t: 'soldier', x: 245 * T, y: 16 * T }, { t: 'archer', x: 249 * T, y: 10 * T },
-  { t: 'knight', x: 252 * T, y: 16 * T }, { t: 'hound', x: 262 * T, y: 16 * T }, { t: 'brute', x: 277 * T, y: 16 * T },
-  { t: 'soldier', x: 289 * T, y: 16 * T }, { t: 'bomber', x: 291 * T, y: 10 * T },
+  { t: 'soldier', x: 209 * T, y: 16 * T }, { t: 'bomber', x: 223 * T, y: 12 * T }, 
+  { t: 'hound', x: 231 * T, y: 16 * T }, { t: 'knight', x: 240 * T, y: 16 * T }, { t: 'archer', x: 249 * T, y: 10 * T },
+  { t: 'hound', x: 262 * T, y: 16 * T }, { t: 'brute', x: 277 * T, y: 16 * T },
+  { t: 'bomber', x: 291 * T, y: 10 * T },
   // Zitadelle
   { t: 'soldier', x: 310 * T, y: 16 * T }, { t: 'archer', x: 313 * T, y: 11 * T }, { t: 'bomber', x: 318 * T, y: 16 * T },
-  { t: 'knight', x: 332 * T, y: 16 * T }, { t: 'bomber', x: 338 * T, y: 12 * T }, { t: 'hound', x: 343 * T, y: 16 * T }, { t: 'soldier', x: 346 * T, y: 16 * T },
-  { t: 'bomber', x: 362 * T, y: 16 * T }, { t: 'archer', x: 367 * T, y: 10 * T }, { t: 'knight', x: 370 * T, y: 16 * T }, { t: 'archer', x: 374 * T, y: 12 * T },
-  { t: 'soldier', x: 377 * T, y: 16 * T }, { t: 'knight', x: 384 * T, y: 16 * T }, { t: 'hound', x: 387 * T, y: 16 * T },
+  { t: 'knight', x: 332 * T, y: 16 * T }, { t: 'bomber', x: 338 * T, y: 12 * T }, 
+  { t: 'archer', x: 367 * T, y: 10 * T }, { t: 'knight', x: 370 * T, y: 16 * T }, 
+  { t: 'knight', x: 384 * T, y: 16 * T }, 
 ];
 let enemies = [];
 function spawnEnemies() {
   enemies = SPAWNS.filter(s => !(s.t === 'brute' && world.bruteDead)).map(s => {
     const d = ETYPES[s.t];
-    return { type: s.t, def: d, x: s.x - d.w / 2, y: s.y - d.h - 0.01, w: d.w, h: d.h, vx: 0, vy: 0, hp: d.hp, face: -1,
+    const z = s.x < 112 * T ? 0 : s.x < 197 * T ? 1 : s.x < 300 * T ? 2 : 3, hm = d.mini ? 1 : [1, 1.35, 1.9, 2.5][z], dm = [1, 1.12, 1.3, 1.5][z];
+    return { type: s.t, def: d, x: s.x - d.w / 2, y: s.y - d.h - 0.01, w: d.w, h: d.h, vx: 0, vy: 0, hp: Math.round(d.hp * hm), maxHp: Math.round(d.hp * hm), mul: dm, soulMul: hm, face: -1,
       state: 'idle', t: 0, cd: rnd(0, 0.6), hitDone: false, dead: false, flash: 0, showBar: 0, onGround: true, atk: d.attacks[0], poiseAcc: 0, seed: Math.random() * 10 };
   });
 }
@@ -1057,7 +1062,7 @@ let bombs = [];
 function throwBomb(e) {
   const sx = e.x + e.w / 2 + e.face * 8, sy = e.y + 8, tx = P.x + P.w / 2 + P.vx * 0.4, ty = P.y + P.h - 6, sp = 300, g = 900;
   const t = clamp(Math.abs(tx - sx) / sp, 0.35, 1.4);
-  bombs.push({ x: sx, y: sy, vx: (tx - sx) / t, vy: (ty - sy) / t - 0.5 * g * t, g, life: 3, dmg: e.atk.dmg, rot: 0 });
+  bombs.push({ x: sx, y: sy, vx: (tx - sx) / t, vy: (ty - sy) / t - 0.5 * g * t, g, life: 3, dmg: e.atk.dmg * e.mul, rot: 0 });
   sfx('swing');
 }
 function explode(x, y, dmg) {
@@ -1088,7 +1093,7 @@ function startEAtk(e, i) { e.atk = e.def.attacks[i]; e.state = 'wind'; e.t = 0; 
 function shootArrow(e) {
   const sx = e.x + e.w / 2 + e.face * 12, sy = e.y + 16, tx = P.x + P.w / 2, ty = P.y + P.h / 2, sp = 560;
   const t = Math.max(0.15, Math.abs(tx - sx) / sp);
-  arrows.push({ x: sx, y: sy, vx: clamp((tx - sx) / t, -sp, sp), vy: (ty - sy) / t - 0.5 * AG * t, life: 3, dmg: e.atk.dmg });
+  arrows.push({ x: sx, y: sy, vx: clamp((tx - sx) / t, -sp, sp), vy: (ty - sy) / t - 0.5 * AG * t, life: 3, dmg: e.atk.dmg * e.mul });
   sfx('bow');
 }
 function updateEnemy(e, dt) {
@@ -1130,12 +1135,12 @@ function updateEnemy(e, dt) {
       break;
     case 'act':
       if (d.kind === 'hound') {
-        if (!e.hitDone && overlap(e, P)) { if (hitPlayer(e.atk.dmg, e.face, 260, { enemy: e, parryable: true })) e.hitDone = true; }
+        if (!e.hitDone && overlap(e, P)) { if (hitPlayer(e.atk.dmg * e.mul, e.face, 260, { enemy: e, parryable: true })) e.hitDone = true; }
         if (e.hitWall) e.vx = 0;
       } else if (d.kind === 'melee') {
         e.vx = approach(e.vx, 0, 900 * dt);
         const a = e.atk, hb = { x: e.face > 0 ? e.x + e.w - 4 : e.x - a.reach + 4, y: e.y + 2, w: a.reach, h: e.h - 4 };
-        if (!e.hitDone && overlap(hb, P)) { if (hitPlayer(a.dmg, e.face, 280, { enemy: e, parryable: true })) e.hitDone = true; }
+        if (!e.hitDone && overlap(hb, P)) { if (hitPlayer(a.dmg * e.mul, e.face, 280, { enemy: e, parryable: true })) e.hitDone = true; }
       }
       if (e.t >= e.atk.act && e.state === 'act') { e.state = 'rec'; e.t = 0; }
       break;
@@ -1157,8 +1162,8 @@ function updateEnemy(e, dt) {
 }
 function hurtEnemy(e, dmg, dir, d) {
   let mul = 1, crit = '';
-  if (e.state === 'parried') { mul = 3; crit = 'Riposte!'; }
-  else if (e.face === dir && (e.state === 'idle' || e.state === 'chase')) { mul = 2; crit = 'Rückenstich!'; }
+  if (e.state === 'parried') { mul = 2.6; crit = 'Riposte!'; }
+  else if (e.face === dir && (e.state === 'idle' || e.state === 'chase')) { mul = 1.8; crit = 'Rückenstich!'; }
   if (crit) mul *= d.critMul || 1;
   dmg = Math.round(dmg * mul);
   e.hp -= dmg; e.flash = 0.12; e.showBar = 3;
@@ -1174,7 +1179,9 @@ function hurtEnemy(e, dmg, dir, d) {
   if (e.state === 'idle') e.state = 'chase';
 }
 function killEnemy(e) {
-  e.dead = true; P.souls += Math.round(e.def.souls * (P.soulMul || 1)); soulBurst(e.x + e.w / 2, e.y + e.h / 2);
+  e.dead = true; P.souls += Math.round(e.def.souls * (e.soulMul || 1) * (P.soulMul || 1));
+  const drop = e.def.mini ? 3 : e.type === 'knight' ? (Math.random() < 0.35 ? 1 : 0) : (Math.random() < 0.06 ? 1 : 0);
+  if (drop) { world.stones = (world.stones || 0) + drop; floatText(e.x + e.w / 2, e.y - 20, '+' + drop + ' Schmiedestein', '#c8d8ff'); } soulBurst(e.x + e.w / 2, e.y + e.h / 2);
   if (e.def.mini) {
     world.bruteDead = true; world.hasKey = true; victoryT = 5; victorySub = 'Erhalten: Turmschlüssel'; victoryTitle = 'GRABWÄCHTER BEZWUNGEN';
     flashes.push({ x: e.x + e.w / 2, y: e.y + 30, r: 360, c: [140, 255, 170], i: 1.2, life: 1.2, max: 1.2 }); sfx('level'); save();
@@ -1200,7 +1207,7 @@ const BATK = {
 };
 let bossActive = false;
 function resetBoss() {
-  Object.assign(B, { x: 104 * T, y: 16 * T - B.h - 0.01, vx: 0, vy: 0, hp: 750, maxHp: 750, hpShow: 750, face: -1, state: 'idle', t: 0,
+  Object.assign(B, { x: 104 * T, y: 16 * T - B.h - 0.01, vx: 0, vy: 0, hp: 1400, maxHp: 1400, hpShow: 1400, face: -1, state: 'idle', t: 0,
     cd: 1.6, atk: null, atkName: '', phase: 1, poise: 0, hitDone: false, onGround: true, flash: 0, combo: 0, dead: false, riposte: false });
 }
 function startBossAtk(n, quick) { B.atkName = n; B.atk = BATK[n]; B.state = 'wind'; B.t = quick ? B.atk.wind * 0.45 : 0; B.hitDone = false; }
@@ -1285,14 +1292,14 @@ function bossAct(dt) {
 let victorySub = '', victoryTitle = 'FEIND BEZWUNGEN';
 function hurtBoss(dmg, dir, d) {
   const b = B; let crit = false;
-  if (b.riposte) { dmg *= 2.5; b.riposte = false; crit = true; }
+  if (b.riposte) { dmg *= 1.8 * (d.critMul || 1); b.riposte = false; crit = true; }
   dmg = Math.round(dmg);
   b.hp -= dmg; b.flash = 0.1;
   if (crit) { hitstop = 0.18; shake = 9; sfx('crit'); blood(b.x + b.w / 2, b.y + 40, dir, 30); floatText(b.x + b.w / 2, b.y - 14, 'Riposte!', '#ffd27a'); }
   else { hitstop = d.poise >= 3 ? 0.08 : 0.04; shake = Math.max(shake, d.poise >= 3 ? 5 : 2); sfx('hit'); blood(b.x + b.w / 2, b.y + 40, dir, 10); }
   sparks(b.x + b.w / 2 - dir * 20, b.y + 40, 5, '#ffd27a');
   if (b.hp <= 0) {
-    b.dead = true; b.hp = 0; world.bossDefeated = true; bossActive = false; P.souls += 3000; victoryT = 6; sfx('level');
+    b.dead = true; b.hp = 0; world.bossDefeated = true; bossActive = false; P.souls += 2000; world.stones = (world.stones || 0) + 3; victoryT = 6; sfx('level');
     victorySub = 'Das Gitter hinter dem Ritter hebt sich …'; victoryTitle = 'FEIND BEZWUNGEN';
     if (!world.armors.includes('gerhart')) { world.armors.push('gerhart'); victorySub = 'Erhalten: Gerharts Harnisch  ·  Das Gitter hebt sich …'; }
     for (let i = 0; i < 90; i++) part(b.x + rnd(0, b.w), b.y + rnd(0, b.h), rnd(-80, 80), rnd(-220, -30), rnd(0.8, 2.2), i % 3 ? '#ffd27a' : '#e8f0ff', rnd(2, 4), -30, true);
@@ -1301,7 +1308,7 @@ function hurtBoss(dmg, dir, d) {
   }
   if (b.state !== 'stagger' && !(b.state === 'act' && b.atkName === 'leap')) {
     b.poise += d.poise;
-    if (b.poise >= 10) { b.poise = 0; b.state = 'stagger'; b.t = 0; b.vx = dir * 120; toast('Gerhart taumelt!', 1.2); }
+    if (b.poise >= 14) { b.poise = 0; b.state = 'stagger'; b.t = 0; b.vx = dir * 120; toast('Gerhart taumelt!', 1.2); }
   }
 }
 
@@ -1314,7 +1321,7 @@ const VATK = { volley: { wind: 0.75, rec: 0.7 }, pillars: { wind: 0.85, rec: 0.9
 let vActive = false, fballs = [], pillars = [];
 function resetV() {
   const base = 16 * T - V.h - 14;
-  Object.assign(V, { x: 414 * T, y: base, base, vx: 0, hp: 950, maxHp: 950, hpShow: 950, face: -1, state: 'idle', t: 0, cd: 1.8, atkName: '', phase: 1,
+  Object.assign(V, { x: 414 * T, y: base, base, vx: 0, hp: 2900, maxHp: 2900, hpShow: 2900, face: -1, state: 'idle', t: 0, cd: 1.8, atkName: '', phase: 1,
     poise: 0, flash: 0, dead: false, riposte: false, alpha: 1, hitDone: false });
   fballs = []; pillars = [];
 }
@@ -1410,12 +1417,12 @@ function updateVProjectiles(dt) {
 }
 function hurtV(dmg, dir, d) {
   const v = V; let crit = false;
-  if (v.riposte) { dmg *= 2.5 * (d.critMul || 1); v.riposte = false; crit = true; }
+  if (v.riposte) { dmg *= 1.8 * (d.critMul || 1); v.riposte = false; crit = true; }
   dmg = Math.round(dmg); v.hp -= dmg; v.flash = 0.1;
   if (crit) { hitstop = 0.18; shake = 9; sfx('crit'); blood(v.x + v.w / 2, v.y + 30, dir, 26); floatText(v.x + v.w / 2, v.y - 14, 'Riposte!', '#ffd27a'); }
   else { hitstop = d.poise >= 3 ? 0.08 : 0.04; shake = Math.max(shake, d.poise >= 3 ? 5 : 2); sfx('hit'); blood(v.x + v.w / 2, v.y + 30, dir, 8); }
   if (v.hp <= 0) {
-    v.dead = true; v.hp = 0; world.boss2Defeated = true; vActive = false; P.souls += 6000; victoryT = 7; sfx('level');
+    v.dead = true; v.hp = 0; world.boss2Defeated = true; vActive = false; P.souls += 5000; world.stones = (world.stones || 0) + 5; victoryT = 7; sfx('level');
     victoryTitle = 'AKT I ABGESCHLOSSEN';
     const got = [];
     if (!world.armors.includes('pyre')) { world.armors.push('pyre'); got.push('Glutpriester-Gewand'); }
@@ -1425,7 +1432,7 @@ function hurtV(dmg, dir, d) {
     flashes.push({ x: v.x + v.w / 2, y: v.y + 30, r: 460, c: [255, 170, 90], i: 1.4, life: 1.8, max: 1.8 });
     fballs = []; pillars = []; save(); return;
   }
-  if (v.state !== 'stagger') { v.poise += d.poise; if (v.poise >= 9) { v.poise = 0; v.state = 'stagger'; v.t = 0; v.alpha = 1; toast('Vaelra taumelt!', 1.2); } }
+  if (v.state !== 'stagger') { v.poise += d.poise; if (v.poise >= 14) { v.poise = 0; v.state = 'stagger'; v.t = 0; v.alpha = 1; toast('Vaelra taumelt!', 1.2); } }
 }
 function drawV() {
   if (!vActive || V.dead) return;
@@ -1454,9 +1461,117 @@ function drawV() {
   ctx.restore();
 }
 
+// ================================================================ ZUFLUCHT: Schmied, Händlerin, Weltentor
+const SMITH_LINES = ['„Bring mir Schmiedesteine, dann lasse ich deine Klinge singen.“', '„Stahl vergisst nicht. Und ich auch nicht.“', '„Noch ein Schlag … dann sitzt die Schneide.“'];
+const MERCH_LINES = ['„Seelen gegen Waren. Fair ist, was überlebt.“', '„Ich habe Dinge gesehen, die du lieber nicht kaufst … aber diese hier schon.“'];
+function upgradeCost(lv) { return { souls: Math.round(500 * Math.pow(lv + 1, 1.6)), stones: lv + 1 }; }
+function openSmith() {
+  gs = 'menu';
+  const line = SMITH_LINES[Math.floor(time) % SMITH_LINES.length];
+  const items = world.weapons.map(id => {
+    const w = WEAPONS[id];
+    return { label: w.name + ' +' + (world.wlevel[id] || 0),
+      info: () => { const lv = world.wlevel[id] || 0; if (lv >= 5) return 'Höchststufe'; const c = upgradeCost(lv); return `→ +${lv + 1}  ·  ${c.souls} Seelen, ${c.stones} Stein${c.stones > 1 ? 'e' : ''}`; },
+      action: () => {
+        const lv = world.wlevel[id] || 0; if (lv >= 5) { toast('Mehr geht nicht.'); return; }
+        const c = upgradeCost(lv);
+        if (P.souls < c.souls) { toast('Nicht genug Seelen'); return; }
+        if ((world.stones || 0) < c.stones) { toast('Nicht genug Schmiedesteine'); return; }
+        P.souls -= c.souls; world.stones -= c.stones; world.wlevel[id] = lv + 1;
+        sfx('block'); sparks(SMITH_X + 30, 15 * T, 18, '#ffd27a'); shake = 3; save(); openSmith(); menu.sel = world.weapons.indexOf(id);
+      } };
+  });
+  items.push({ label: 'Gehen', action: closeMenu });
+  openMenu({ title: 'Brandt, der Schmied', sub: () => `${line}     Seelen ${P.souls}  ·  Schmiedesteine ${world.stones || 0}`, style: 'panel', wide: true, back: closeMenu, items });
+}
+function openMerchant() {
+  gs = 'menu';
+  const line = MERCH_LINES[Math.floor(time) % MERCH_LINES.length];
+  const buy = (price, fn) => () => { if (P.souls < price) { toast('Nicht genug Seelen'); return; } P.souls -= price; fn(); sfx('pickup'); save(); const sel = menu.sel; openMerchant(); menu.sel = Math.min(sel, menu.items.length - 1); };
+  const items = [{ label: 'Schmiedestein', info: '450 Seelen', action: buy(450, () => { world.stones = (world.stones || 0) + 1; }) }];
+  if (!world.boughtFlask) items.push({ label: 'Glutsplitter (+1 Heiltrank)', info: '3500 Seelen', action: buy(3500, () => { world.boughtFlask = true; world.flaskBonus++; recalcStats(); P.flasks++; }) });
+  for (const id in RINGS) if (!world.rings.includes(id)) items.push({ label: RINGS[id].name, info: '2800 Seelen', action: buy(2800, () => world.rings.push(id)) });
+  for (const id in WEAPONS) if (!world.weapons.includes(id)) items.push({ label: WEAPONS[id].name, info: '3500 Seelen', action: buy(3500, () => world.weapons.push(id)) });
+  items.push({ label: 'Gehen', action: closeMenu });
+  openMenu({ title: 'Odila, die Händlerin', sub: () => `${line}     Seelen ${P.souls}`, style: 'panel', wide: true, back: closeMenu, items });
+}
+function travelTo(i) {
+  world.bonfire = i; resetPlayer(); spawnEnemies(); waves = []; arrows = []; bombs = []; fires = [];
+  if (!world.bossDefeated) { resetBoss(); bossActive = false; } if (!world.boss2Defeated) { resetV(); vActive = false; }
+  cam.x = clamp(P.x - VW / 2, i === HUB ? 426 * T : 0, W * T - VW); sfx('fire'); save(); closeMenu(); toast(BONFIRES[i].name, 1.8);
+}
+function openPortal() {
+  gs = 'menu';
+  const items = [];
+  BONFIRES.forEach((b, i) => { if (i !== HUB && (world.lit[i] || i === 0)) items.push({ label: b.name, info: i === 0 && !world.lit[0] ? 'Beginn des Pfades' : '', action: () => travelTo(i) }); });
+  items.push({ label: 'Bleiben', action: closeMenu });
+  openMenu({ title: 'Das Weltentor', sub: 'Wohin soll dich die Glut tragen?', style: 'panel', back: closeMenu, items });
+}
+function drawHubNPCs() {
+  if (cam.x < 420 * T) return;
+  // Esse
+  const fx = 429 * T;
+  ctx.fillStyle = '#2a2622'; ctx.fillRect(fx - 4, 16 * T - 58, 56, 58); ctx.fillStyle = '#3a342e'; ctx.fillRect(fx - 8, 16 * T - 62, 64, 8);
+  ctx.fillStyle = '#1a0e08'; ctx.fillRect(fx + 10, 16 * T - 36, 28, 22);
+  ctx.fillStyle = '#2a2622'; ctx.fillRect(fx + 14, 16 * T - 130, 20, 70);
+  // Amboss
+  const ax = SMITH_X + 34, ay = 16 * T;
+  ctx.fillStyle = '#3a3a42'; ctx.fillRect(ax - 6, ay - 12, 12, 12); ctx.fillStyle = '#55565e'; ctx.beginPath(); ctx.moveTo(ax - 16, ay - 20); ctx.lineTo(ax + 18, ay - 20); ctx.lineTo(ax + 12, ay - 12); ctx.lineTo(ax - 10, ay - 12); ctx.fill();
+  ctx.fillStyle = 'rgba(230,235,255,0.25)'; ctx.fillRect(ax - 16, ay - 20, 34, 1.5);
+  // Schmied
+  const swing = (time * 1.1) % 1, hit = swing > 0.82;
+  ctx.save(); ctx.translate(SMITH_X, 16 * T); ctx.scale(1.15, 1.15);
+  shadow(0, 0, 20);
+  ctx.fillStyle = '#3a2e24'; ctx.fillRect(-9, -20, 8, 20); ctx.fillRect(1, -20, 8, 20);
+  ctx.fillStyle = '#1e1812'; ctx.fillRect(-10, -5, 10, 5); ctx.fillRect(0, -5, 10, 5);
+  const g = ctx.createLinearGradient(0, -50, 0, -18); g.addColorStop(0, '#8a6a52'); g.addColorStop(1, '#5a4434');
+  ctx.fillStyle = g; ctx.fillRect(-13, -50, 26, 32);
+  ctx.fillStyle = '#4a3420'; ctx.fillRect(-11, -42, 22, 30);
+  ctx.fillStyle = '#9a7a60'; ctx.beginPath(); ctx.arc(2, -56, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#5a4030'; ctx.beginPath(); ctx.moveTo(-3, -54); ctx.quadraticCurveTo(2, -40, 9, -52); ctx.fill();
+  ctx.fillStyle = '#0a0806'; ctx.fillRect(4, -58, 2, 2);
+  const ang = hit ? 0.6 : lerp(-2.2, 0.6, Math.max(0, (swing - 0.55) / 0.27));
+  ctx.save(); ctx.translate(10, -40); ctx.rotate(ang); ctx.fillStyle = '#4a3420'; ctx.fillRect(0, -2, 22, 4); ctx.fillStyle = '#5a5a64'; ctx.fillRect(18, -6, 9, 12); ctx.restore();
+  ctx.strokeStyle = '#8a6a52'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(6, -46); ctx.lineTo(10, -40); ctx.stroke();
+  ctx.restore();
+  if (hit && Math.random() < 0.5) { sparks(ax, ay - 22, 3, '#ffd27a'); if (Math.abs(P.x - SMITH_X) < 400 && Math.random() < 0.15) sfx('block'); }
+  // Händlerin mit Karren
+  const mx = MERCH_X;
+  ctx.fillStyle = '#4a3020'; ctx.fillRect(mx + 18, 16 * T - 34, 46, 22); ctx.fillStyle = '#3a2416'; ctx.beginPath(); ctx.arc(mx + 26, 16 * T - 8, 8, 0, 7); ctx.arc(mx + 56, 16 * T - 8, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#6a5a3a'; ctx.beginPath(); ctx.ellipse(mx + 30, 16 * T - 38, 10, 8, 0, 0, 7); ctx.ellipse(mx + 50, 16 * T - 40, 12, 9, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3a2a1c'; ctx.fillRect(mx - 14, 16 * T - 14, 26, 14);
+  ctx.save(); ctx.translate(mx, 16 * T - 12); ctx.scale(-1, 1);
+  ctx.fillStyle = '#3e2e3a'; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(12, 0); ctx.lineTo(8, -30); ctx.lineTo(-8, -30); ctx.fill();
+  ctx.fillStyle = '#2e2230'; ctx.beginPath(); ctx.moveTo(-8, -28); ctx.quadraticCurveTo(-10, -46, 0, -47); ctx.quadraticCurveTo(9, -45, 8, -28); ctx.fill();
+  ctx.fillStyle = '#0a0806'; ctx.beginPath(); ctx.ellipse(3, -37, 3, 4, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#e8d0a0'; ctx.fillRect(3, -38, 1.5, 1.2);
+  ctx.restore();
+  // Weltentor
+  const px2 = PORTAL_X;
+  ctx.fillStyle = '#2e2a30'; ctx.fillRect(px2 - 44, 16 * T - 150, 14, 150); ctx.fillRect(px2 + 30, 16 * T - 150, 14, 150);
+  ctx.strokeStyle = '#2e2a30'; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(px2, 16 * T - 150, 37, Math.PI, 0); ctx.stroke();
+  ctx.fillStyle = '#8a7a58'; ctx.fillRect(px2 - 46, 16 * T - 6, 92, 6);
+}
+function drawHubEmissive() {
+  if (cam.x < 420 * T) return;
+  const fx = 429 * T;
+  radial(fx + 24, 16 * T - 25, 40, '255,120,40', 0.6 + Math.sin(time * 8) * 0.1); flame(fx + 24, 16 * T - 14, 16, 12, 3);
+  radial(MERCH_X - 18, 16 * T - 30, 22, '255,200,120', 0.55); ctx.fillStyle = '#ffe0a0'; ctx.fillRect(MERCH_X - 21, 16 * T - 34, 6, 8);
+  const px2 = PORTAL_X;
+  for (let k = 0; k < 5; k++) {
+    const a = time * (0.6 + k * 0.2) + k;
+    ctx.strokeStyle = `rgba(${k % 2 ? '150,120,255' : '255,160,90'},${0.25 + 0.1 * Math.sin(time * 2 + k)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(px2, 16 * T - 95, 26 - k * 3, 88 - k * 10, 0, a, a + 4); ctx.stroke();
+  }
+  radial(px2, 16 * T - 95, 70, '170,130,255', 0.35 + 0.08 * Math.sin(time * 3));
+}
+
 // ================================================================ INTERAKTION
 function nearInteract() {
   const px = P.x + P.w / 2, feet = P.y + P.h;
+  if (Math.abs(px - SMITH_X) < 46 && feet > 15 * T) return { k: 'smith', label: 'Mit Brandt, dem Schmied, sprechen' };
+  if (Math.abs(px - MERCH_X) < 46 && feet > 15 * T) return { k: 'merch', label: 'Mit Odila, der Händlerin, sprechen' };
+  if (Math.abs(px - PORTAL_X) < 40 && feet > 15 * T) return { k: 'portal', label: 'Durch das Weltentor reisen' };
   for (let i = 0; i < BONFIRES.length; i++) { const bf = BONFIRES[i]; if (Math.abs(px - bf.x) < 44 && Math.abs(feet - bf.y) < 10) return { k: 'bonfire', i, label: world.lit[i] ? 'Am Leuchtfeuer rasten' : 'Leuchtfeuer entzünden' }; }
   if (!world.doorOpen && feet > 13 * T && feet < 16 * T + 2 && Math.abs(px - (DOOR_X * T + 16)) < 42) return { k: 'door', label: px > DOOR_X * T + 16 ? 'Tür öffnen' : 'Tür untersuchen' };
   if (!world.bossDefeated && px < FOG_X * T && px > FOG_X * T - 44 && feet > 12 * T) return { k: 'fog', label: 'Durch den Nebel gehen' };
@@ -1469,6 +1584,9 @@ function nearInteract() {
 }
 function interact(n) {
   if (n.k === 'bonfire') rest(n.i);
+  else if (n.k === 'smith') openSmith();
+  else if (n.k === 'merch') openMerchant();
+  else if (n.k === 'portal') openPortal();
   else if (n.k === 'door') {
     if (P.x + P.w / 2 > DOOR_X * T + 16) { world.doorOpen = true; buildMap(); shake = 5; sfx('door'); dust(DOOR_X * T + 16, 16 * T, 16); toast('Abkürzung geöffnet'); save(); }
     else toast('Lässt sich von dieser Seite nicht öffnen');
@@ -1578,7 +1696,7 @@ function openBonfire() {
     { label: 'Stärke', info: () => 'Schaden ×' + P.dmgMul.toFixed(2), action: lv('str') },
     { label: 'Ausrüstung', action: () => openEquip(openBonfire) },
   ];
-  BONFIRES.forEach((b, i) => { if (i !== world.bonfire && world.lit[i]) items.push({ label: 'Reisen', info: b.name, action: () => {
+  BONFIRES.forEach((b, i) => { if (i !== world.bonfire && (world.lit[i] || i === 0)) items.push({ label: 'Reisen', info: b.name, action: () => {
     world.bonfire = i; resetPlayer(); spawnEnemies(); cam.x = clamp(P.x - VW / 2, 0, W * T - VW); sfx('fire'); save(); closeMenu(); toast(b.name, 1.8); } }); });
   items.push({ label: 'Weiterziehen', action: closeMenu });
   openMenu({ title: bf.name, sub: () => `Stufe ${level()}   ·   Seelen ${P.souls}   ·   Nächste Stufe ${lvlCost()}`, style: 'panel', back: closeMenu, items });
@@ -1618,6 +1736,7 @@ function save() {
       stats, souls: P.souls, weapon: P.weapon, armor: P.armor, ring: P.ring,
       w: { doorOpen: world.doorOpen, bossDefeated: world.bossDefeated, lit: world.lit, bonfire: world.bonfire, stain: world.stain,
         flaskBonus: world.flaskBonus, weapons: world.weapons, armors: world.armors, rings: world.rings, playTime: world.playTime,
+        wlevel: world.wlevel, stones: world.stones, boughtFlask: world.boughtFlask,
         gateOpen: world.gateOpen, towerOpen: world.towerOpen, hasKey: world.hasKey, bruteDead: world.bruteDead, boss2Defeated: world.boss2Defeated,
         items: world.items.map(i => i.taken), chests: world.chests.map(c => c.opened) },
     }));
@@ -1628,7 +1747,8 @@ function applySave(s) {
   initWorld();
   stats.vit = stats.end = stats.str = 0; Object.assign(stats, s.stats || {});
   P.souls = s.souls | 0;
-  world.doorOpen = !!w.doorOpen; world.bossDefeated = !!w.bossDefeated; world.lit = [0, 1, 2, 3].map(i => !!(w.lit || [])[i]);
+  world.doorOpen = !!w.doorOpen; world.bossDefeated = !!w.bossDefeated; world.lit = [0, 1, 2, 3, 4].map(i => i === HUB || !!(w.lit || [])[i]);
+  world.wlevel = w.wlevel || {}; world.stones = w.stones | 0; world.boughtFlask = !!w.boughtFlask;
   world.gateOpen = !!w.gateOpen; world.towerOpen = !!w.towerOpen; world.hasKey = !!w.hasKey; world.bruteDead = !!w.bruteDead; world.boss2Defeated = !!w.boss2Defeated;
   world.rings = (w.rings || []).filter(id => RINGS[id]);
   world.bonfire = clamp(w.bonfire | 0, 0, BONFIRES.length - 1); world.stain = w.stain || null;
@@ -1649,7 +1769,7 @@ function loadSlot(i) {
 }
 function startNew(i) {
   slot = i; initWorld(); stats.vit = stats.end = stats.str = 0; P.souls = 0; P.weapon = 'sword'; P.armor = 'wanderer'; P.ring = null;
-  startWorld(); save(); toast('Der Pfad beginnt …', 2.5);
+  startWorld(); save(); toast('Die Zuflucht – das Weltentor rechts führt zum Pfad', 3.5);
 }
 function startWorld() {
   buildMap(); resetPlayer(); spawnEnemies(); resetBoss(); bossActive = false; resetV(); vActive = false; bombs = []; fires = [];
@@ -1725,7 +1845,8 @@ function update(dt, I) {
   if (gs !== 'play') return;   // gerade gestorben: nichts mehr aufsammeln
   const px = P.x + P.w / 2, feet = P.y + P.h;
   for (const it of world.items) if (!it.taken && Math.abs(px - it.x) < 22 && Math.abs(feet - it.y) < 34) {
-    it.taken = true; P.souls += it.souls; soulBurst(it.x, it.y - 14, 12); toast('+' + it.souls + ' Seelen', 1.5); sfx('pickup');
+    it.taken = true; P.souls += it.souls; soulBurst(it.x, it.y - 14, 12); sfx('pickup');
+    if (it.stones) { world.stones = (world.stones || 0) + it.stones; toast('+' + it.stones + ' Schmiedestein' + (it.stones > 1 ? 'e' : ''), 1.8); } else toast('+' + it.souls + ' Seelen', 1.5);
   }
   const s = world.stain;
   if (s && Math.abs(px - s.x) < 24 && Math.abs(feet - s.y) < 40) {
@@ -1734,7 +1855,8 @@ function update(dt, I) {
   let tx = P.x + P.w / 2 - VW / 2 + P.face * 50;
   if (bossActive) tx = ARENA_X0 + 16;
   if (vActive) tx = ARENA2_X0;
-  cam.x = lerp(cam.x, clamp(tx, 0, W * T - VW), 0.1);
+  const inHub = P.x > 425 * T;
+  cam.x = lerp(cam.x, inHub ? clamp(tx, 426 * T, W * T - VW) : clamp(tx, 0, 424 * T - VW), Math.abs(cam.x - tx) > 1500 ? 1 : 0.1);
   cam.y = clamp(P.y + P.h / 2 - VH / 2, 0, H * T - VH);
 }
 
@@ -1850,6 +1972,12 @@ function drawCrypt() {
   drawStrip(LAYERS.kMid, 0.42, 0);
   ctx.fillStyle = 'rgba(10,30,16,0.25)'; ctx.fillRect(0, 0, VW, VH);
 }
+function drawHub() {
+  drawChapel();
+  ctx.fillStyle = 'rgba(70,34,12,0.32)'; ctx.fillRect(0, 0, VW, VH);
+  const g = ctx.createRadialGradient(VW / 2, VH * 0.75, 40, VW / 2, VH * 0.75, 520); g.addColorStop(0, 'rgba(255,150,70,0.18)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+}
 function drawBackground() {
   bgx.setTransform(1, 0, 0, 1, 0, 0); ctx = bgx;
   const A = areaW(), out = A.ruins + A.citadel;
@@ -1863,6 +1991,7 @@ function drawBackground() {
   blend(out, () => drawOutdoor(out > 0 ? A.citadel / out : 0));
   blend(A.chapel, drawChapel);
   blend(A.crypt, drawCrypt);
+  blend(A.hub, drawHub);
   ctx = bgx;
 }
 
@@ -1908,7 +2037,7 @@ function drawWorld() {
     else { ctx.fillStyle = '#6a4630'; ctx.beginPath(); ctx.moveTo(x, y - 16); ctx.lineTo(x, y - 20); ctx.quadraticCurveTo(x + 14, y - 27, x + 28, y - 20); ctx.lineTo(x + 28, y - 16); ctx.fill(); ctx.fillStyle = '#9a8048'; ctx.fillRect(x, y - 17, 28, 1); }
   }
   for (const e of enemies) if (!e.dead && Math.abs(e.x - cam.x - VW / 2) < VW) drawEnemy(e);
-  drawBoss(); drawV();
+  drawBoss(); drawV(); drawHubNPCs();
   drawPlayer();
   ctx.strokeStyle = '#b8a888'; ctx.lineWidth = 2;
   for (const a of arrows) {
@@ -1935,6 +2064,7 @@ function collectLights() {
   for (const p of pillars) add(p.x, 16 * T - 60, p.fired ? 220 : 90, [255, 130, 50], p.fired ? 1.1 : 0.5);
   if (vActive && !V.dead) add(V.x + V.w / 2, V.y - 10, 200, [255, 140, 60], 0.9);
   if (!world.boss2Defeated) add(FOG2_X * T + 16, 14 * T, 160, [255, 190, 150], 0.6);
+  add(429 * T + 24, 16 * T - 30, 260, [255, 120, 50], 1.1 + Math.sin(time * 8) * 0.08); add(MERCH_X - 18, 16 * T - 30, 160, [255, 200, 120], 0.8); add(PORTAL_X, 16 * T - 95, 220, [170, 130, 255], 0.8);
   for (const f of fires) add(f.x + f.w / 2, f.y - 14, 150, [255, 130, 50], 0.9 * clamp(f.life, 0, 1));
   for (const f of flashes) add(f.x, f.y, f.r, f.c, f.i * (f.life / f.max));
   if (bossActive && !B.dead) add(B.x + B.w / 2, B.y + 10, 90, B.phase === 2 ? [255, 70, 30] : [255, 170, 60], 0.45);
@@ -1942,8 +2072,8 @@ function collectLights() {
 }
 function applyLighting() {
   const A = areaW(), ch = 1 - (A.ruins + A.citadel);
-  const AMB = { ruins: [62, 68, 90], chapel: [50, 58, 64], crypt: [50, 62, 56], citadel: [76, 54, 48] };
-  const amb = [0, 1, 2].map(i => A.ruins * AMB.ruins[i] + A.chapel * AMB.chapel[i] + A.crypt * AMB.crypt[i] + A.citadel * AMB.citadel[i] + lightning * 150);
+  const AMB = { ruins: [62, 68, 90], chapel: [50, 58, 64], crypt: [50, 62, 56], citadel: [76, 54, 48], hub: [92, 74, 60] };
+  const amb = [0, 1, 2].map(i => A.ruins * AMB.ruins[i] + A.chapel * AMB.chapel[i] + A.crypt * AMB.crypt[i] + A.citadel * AMB.citadel[i] + (A.hub || 0) * AMB.hub[i] + lightning * 150);
   lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'source-over';
   lctx.fillStyle = `rgb(${amb.map(v => Math.min(255, v | 0)).join(',')})`; lctx.fillRect(0, 0, lC.width, lC.height);
   // etwas mehr Mondlicht oben im Freien
@@ -1983,6 +2113,7 @@ function drawEmissive() {
     const a = 0.12 + 0.06 * Math.sin(time * 2 + ty * 1.3 + i * 2);
     ctx.fillStyle = `rgba(200,210,230,${a})`; ctx.beginPath(); ctx.ellipse(FOG_X * T + 16 + Math.sin(time * 1.5 + ty + i) * 8, ty * T + 12 + i * 4, 24, 15, 0, 0, 7); ctx.fill();
   }
+  drawHubEmissive();
   for (const [tx, ty] of SPIKES) {
     const px = tx * T, py = ty * T; if (Math.abs(px - cam.x - VW / 2) > VW) continue;
     const pulse = 0.55 + 0.25 * Math.sin(time * 3 + tx);
@@ -2039,9 +2170,9 @@ function drawWorldUI() {
     if (e.dead || Math.abs(e.x - cam.x - VW / 2) > VW) continue;
     const cx = e.x + e.w / 2;
     if (e.state === 'parried') text('!', cx, e.y - 18 + Math.sin(time * 10) * 2, 22, '#ffd27a');
-    if (e.showBar > 0 && e.hp < e.def.hp) {
+    if (e.showBar > 0 && e.hp < e.maxHp) {
       const w = 34; ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(cx - w / 2 - 1, e.y - 12, w + 2, 5);
-      ctx.fillStyle = '#9a1818'; ctx.fillRect(cx - w / 2, e.y - 11, w * e.hp / e.def.hp, 3);
+      ctx.fillStyle = '#9a1818'; ctx.fillRect(cx - w / 2, e.y - 11, w * e.hp / e.maxHp, 3);
     }
   }
   if (vActive && V.riposte) text('!', V.x + V.w / 2, V.y - 30 + Math.sin(time * 10) * 2, 30, '#ffd27a');
@@ -2319,14 +2450,15 @@ function drawHUD() {
     ctx.fillStyle = full ? '#2fa848' : '#1a2a1e'; ctx.fillRect(x, y + 5, 10, 11); ctx.fillRect(x + 3, y, 4, 5);
     if (full) { ctx.fillStyle = '#b0ffb8'; ctx.fillRect(x + 2, y + 7, 2, 6); }
   }
-  text(WEAPONS[P.weapon].name + '  ·  ' + ARMORS[P.armor].name + (P.ring ? '  ·  ' + RINGS[P.ring].name : ''), 28, 93, 13, '#a0968a', 'left');
+  text(WEAPONS[P.weapon].name + ((world.wlevel || {})[P.weapon] ? ' +' + world.wlevel[P.weapon] : '') + '  ·  ' + ARMORS[P.armor].name + (P.ring ? '  ·  ' + RINGS[P.ring].name : ''), 28, 93, 13, '#a0968a', 'left');
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(VW - 190, VH - 56, 166, 34);
   ctx.strokeStyle = '#5e5240'; ctx.strokeRect(VW - 189.5, VH - 55.5, 165, 33);
   text('Seelen', VW - 178, VH - 39, 14, '#a0968a', 'left');
   text(String(P.souls), VW - 34, VH - 39, 20, '#e8f0ff', 'right');
+  if (world.stones) text('Schmiedesteine  ' + world.stones, VW - 34, VH - 66, 13, '#a8b8e0', 'right');
   let bossBar = null;
   if (vActive && !V.dead) bossBar = [VNAME, V.hp / V.maxHp, V.hpShow / V.maxHp];
-  for (const e of enemies) if (e.def.mini && !e.dead && e.state !== 'idle' && Math.abs(e.x - P.x) < 700) bossBar = [e.def.name, e.hp / e.def.hp, e.hp / e.def.hp];
+  for (const e of enemies) if (e.def.mini && !e.dead && e.state !== 'idle' && Math.abs(e.x - P.x) < 700) bossBar = [e.def.name, e.hp / e.maxHp, e.hp / e.maxHp];
   if (bossBar) { const w = 520, x = (VW - w) / 2 - 30, y = VH - 48; text(bossBar[0], x, y - 16, 17, '#e0d6c4', 'left', undefined, 1); bar(x, y, w, 9, bossBar[1], bossBar[2], '#a01c1c', '#4a0a0a'); }
   if (bossActive && !B.dead) {
     const w = 520, x = (VW - w) / 2 - 30, y = VH - 48;
