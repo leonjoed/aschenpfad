@@ -1,0 +1,201 @@
+{
+  "standing_height_H_px": 56,
+  "orientation": "Griff links, Spitze/Wirkende rechts, 0 Grad horizontal",
+  "weapons": [
+    {
+      "id": "sword",
+      "name": "Langschwert",
+      "length_px": 42,
+      "length_over_H": 0.75,
+      "grip_x": 4,
+      "grip_y": 7,
+      "tip_x": 41,
+      "tip_y": 7,
+      "image_size": [
+        46,
+        15
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "axe",
+      "name": "Großaxt",
+      "length_px": 45,
+      "length_over_H": 0.8,
+      "grip_x": 4,
+      "grip_y": 14,
+      "tip_x": 44,
+      "tip_y": 14,
+      "image_size": [
+        49,
+        28
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "dagger",
+      "name": "Totengräberdolch",
+      "length_px": 22,
+      "length_over_H": 0.39,
+      "grip_x": 4,
+      "grip_y": 5,
+      "tip_x": 21,
+      "tip_y": 5,
+      "image_size": [
+        26,
+        10
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "spear",
+      "name": "Wächterspeer",
+      "length_px": 67,
+      "length_over_H": 1.2,
+      "grip_x": 4,
+      "grip_y": 8,
+      "tip_x": 66,
+      "tip_y": 8,
+      "image_size": [
+        71,
+        17
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "scythe",
+      "name": "Moorsense",
+      "length_px": 56,
+      "length_over_H": 1.0,
+      "grip_x": 4,
+      "grip_y": 13,
+      "tip_x": 55,
+      "tip_y": 13,
+      "image_size": [
+        60,
+        27
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "club",
+      "name": "Knochenkeule",
+      "length_px": 39,
+      "length_over_H": 0.7,
+      "grip_x": 4,
+      "grip_y": 8,
+      "tip_x": 38,
+      "tip_y": 8,
+      "image_size": [
+        43,
+        17
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "ashbrand",
+      "name": "Aschenklinge des Ersten",
+      "length_px": 56,
+      "length_over_H": 1.0,
+      "grip_x": 4,
+      "grip_y": 10,
+      "tip_x": 55,
+      "tip_y": 10,
+      "image_size": [
+        60,
+        20
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "rotscythe",
+      "name": "Moderhippe",
+      "length_px": 56,
+      "length_over_H": 1.0,
+      "grip_x": 4,
+      "grip_y": 13,
+      "tip_x": 55,
+      "tip_y": 13,
+      "image_size": [
+        60,
+        27
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "cutlass",
+      "name": "Entermesser",
+      "length_px": 39,
+      "length_over_H": 0.7,
+      "grip_x": 4,
+      "grip_y": 7,
+      "tip_x": 38,
+      "tip_y": 7,
+      "image_size": [
+        43,
+        14
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "trident",
+      "name": "Dreizack des Ertrunkenen",
+      "length_px": 67,
+      "length_over_H": 1.2,
+      "grip_x": 4,
+      "grip_y": 13,
+      "tip_x": 66,
+      "tip_y": 13,
+      "image_size": [
+        71,
+        26
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "icepick",
+      "name": "Eispickel",
+      "length_px": 36,
+      "length_over_H": 0.64,
+      "grip_x": 4,
+      "grip_y": 11,
+      "tip_x": 35,
+      "tip_y": 11,
+      "image_size": [
+        40,
+        23
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "frostblade",
+      "name": "Frostklinge",
+      "length_px": 56,
+      "length_over_H": 1.0,
+      "grip_x": 4,
+      "grip_y": 8,
+      "tip_x": 55,
+      "tip_y": 8,
+      "image_size": [
+        60,
+        17
+      ],
+      "note": "Endpunkte/Griff automatisiert geschätzt; Stichwaffen tatsächliche Spitzen an der rechten Kontur."
+    },
+    {
+      "id": "greatsword",
+      "name": "Großschwert der Asche",
+      "length_px": 62,
+      "length_over_H": 1.11,
+      "grip_x": 4,
+      "grip_y": 10,
+      "tip_x": 61,
+      "tip_y": 10,
+      "image_size": [
+        66,
+        21
+      ],
+      "note": "Final geprüft: Griff links, Spitze rechts."
+    }
+  ]
+}

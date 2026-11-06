@@ -34,6 +34,8 @@ Geplant: Himmelsturm (vertikal), Der Abgrund / Die Andere Seite (Finale / NG+).
 
 - `index.html` – das komplette Spiel
 - `sprite/` – Werkzeuge und Atlas für den Pixel-Art-Helden (aus den Sprite-Sheets des Autors zusammengebaut)
+- `waffen/` – Pixel-Art der 13 Waffen (Griff links)
+- `sprite/atlas_nosword.png` + `sprite/hand_anchors.json` – Held ohne Waffe und Handpunkte je Pose
 - `helden.html` – frühe Entwurfsseite für den Helden
 
 ## Versionen
@@ -50,3 +52,4 @@ Jede Version ist ein eigener Commit, die Versionsnummer steht am Anfang der Comm
 | v0.9.3 | Controller-Erkennung über alle Slots, Controller-Diagnose, „Zur Zuflucht reisen“ |
 | v0.9.6 | Feuer verletzt Gegner und fällt zu Boden, Leuchtfeuer nach Endbossen, Weltentor entfernt, Waffenstufen im Menü, Reisen nach Gebieten gruppiert |
 | v0.9.8 | Waffenbilder im Ausrüstungsmenü |
+| v0.10 | Held ohne festes Schwert, alle 13 Waffen als Pixel-Art in der Hand und im Menü |
