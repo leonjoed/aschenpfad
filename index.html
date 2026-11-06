@@ -561,7 +561,15 @@ const BONFIRES = [
   { x: 1018 * T + 16, y: 16 * T, name: 'Pilzlichtung' },
   { x: 1134 * T + 16, y: 16 * T, name: 'Gebeinpforte' },
   { x: 1199 * T + 16, y: 16 * T, name: 'Rippenhalle' },
+  // erscheinen erst nach dem Sieg über den Gebietsboss
+  { x: 409 * T + 16, y: 16 * T, name: 'Vaelras Thronsaal', need: 'boss2Defeated' },
+  { x: 598 * T + 16, y: 16 * T, name: 'Grolmoks Grube', need: 'boss3Defeated' },
+  { x: 766 * T + 16, y: 16 * T, name: 'Thron der Königin', need: 'flag:boss4' },
+  { x: 943 * T + 16, y: 16 * T, name: 'Tharns Halle', need: 'flag:boss5' },
+  { x: 1114 * T + 16, y: 16 * T, name: 'Ysras Lichtung', need: 'flag:boss6' },
+  { x: 1286 * T + 16, y: 16 * T, name: 'Asche des Ersten', need: 'flag:boss7' },
 ];
+const bfOn = i => !BONFIRES[i].need || needMet(BONFIRES[i].need);
 // Regionen = voneinander getrennte Kartenabschnitte (Kamera bleibt darin)
 const REGIONS = [[0, 424], [426, 462], [462, 625], [626, 788], [789, 958], [959, 1130], [1131, 1300]];
 function regionOf(px) { const tx = px / T; for (const r of REGIONS) if (tx >= r[0] && tx < r[1]) return r; return REGIONS[0]; }
@@ -619,7 +627,7 @@ const SIGNS = [
   { x: 265 * T, y: 16 * T, text: 'Der Grabwächter hütet den Turmschlüssel.' },
   { x: 309 * T, y: 16 * T, text: 'Feuertöpfe! Nicht stehen bleiben.' },
   { x: 389 * T, y: 16 * T, text: 'Die Glutpriesterin wartet. Ihre Flammen folgen dir.' },
-  { x: 440 * T, y: 16 * T, text: 'Die Zuflucht. Schmied links, Händlerin rechts, das Weltentor führt hinaus.' },
+  { x: 440 * T, y: 16 * T, text: 'Die Zuflucht. Schmied links, Händlerin rechts. Vom Leuchtfeuer aus reist du in die Welten.' },
   { x: 469 * T, y: 16 * T, text: 'Das Wasser ist giftig. Ein Heiltrank vertreibt das Gift.' },
   { x: 488 * T, y: 16 * T, text: 'Die Aufgeblähten platzen. Halte Abstand.' },
   { x: 589 * T, y: 16 * T, text: 'Der Boden bebt. Etwas Großes wühlt unter dem Moor.' },
@@ -690,7 +698,7 @@ function buildMap() {
   f(423, 0, 426, 16, '#'); f(427, 1, 460, 3, '#'); f(461, 0, SWAMP_X0, 16, '#');
   // --- Akt II: Der Giftsumpf
   f(472, 15, 479, 15, 'w'); f(481, 14, 487, 14, 'b');
-  f(497, 12, 500, 12, 'b'); f(502, 15, 507, 15, 'w');
+  f(497, 12, 500, 12, 'b'); f(493, 14, 494, 14, 'b'); f(493, 15, 493, 15, 'p'); f(494, 15, 494, 15, 'p'); f(502, 15, 507, 15, 'w');
   f(510, 13, 511, 13, 'b'); f(513, 10, 515, 10, 'b');
   f(520, 16, 520, 16, '#'); f(522, 16, 522, 16, '#');
   f(530, 11, 534, 11, 'b'); f(529, 12, 529, 15, 'p'); f(535, 12, 533, 15, 'p'); f(536, 14, 536, 15, 'b');
@@ -1170,7 +1178,7 @@ function addCold(n) {
 }
 function nearWarmth(x, y, r = 140) {
   for (const w of WARM) if (Math.abs(w.x - x) < r && Math.abs(w.y - y) < 90) return true;
-  for (let i = 0; i < BONFIRES.length; i++) if (world.lit[i] && Math.abs(BONFIRES[i].x - x) < r && Math.abs(BONFIRES[i].y - y) < 90) return true;
+  for (let i = 0; i < BONFIRES.length; i++) if (world.lit[i] && bfOn(i) && Math.abs(BONFIRES[i].x - x) < r && Math.abs(BONFIRES[i].y - y) < 90) return true;
   return false;
 }
 function updateCold(dt) {
@@ -1507,7 +1515,20 @@ function explode(x, y, dmg) {
   for (let i = 0; i < 10; i++) part(x, y, rnd(-80, 80), rnd(-120, -20), rnd(0.6, 1.2), 'rgba(60,50,45,0.6)', rnd(4, 7), -30);
   const dx = P.x + P.w / 2 - x, dy = P.y + P.h / 2 - y;
   if (Math.hypot(dx, dy * 0.8) < 62) hitPlayer(dmg, dx >= 0 ? 1 : -1, 300, {});
-  fires.push({ x: x - 24, w: 48, y: Math.floor((y + 4) / T) * T, life: 1.6, tick: 0 });
+  for (const e of enemies) { if (e.dead) continue; const ex = e.x + e.w / 2 - x, ey = e.y + e.h / 2 - y; if (Math.hypot(ex, ey * 0.8) < 66) burnEnemy(e, dmg * 0.8, ex >= 0 ? 1 : -1); }
+  spawnFire(x, y);
+}
+function spawnFire(x, y) {
+  let r = Math.floor(y / T); while (r > 0 && solidAt(x, r * T + 2)) r--;
+  let gy = null; for (let yy = r; yy < H; yy++) if (solidAt(x, yy * T + 2) || platAt(x, yy * T + 2)) { gy = yy * T; break; }
+  if (gy === null) return;
+  fires.push({ x: x - 24, w: 48, y: Math.min(y, gy), gy, vy: 0, life: 1.9, tick: 0, et: new Map() });
+}
+function burnEnemy(e, dmg, dir) {
+  e.hp -= dmg; e.flash = 0.1; e.showBar = 3; floatText(e.x + e.w / 2, e.y - 6, String(Math.round(dmg)), '#ffb060');
+  for (let k = 0; k < 5; k++) part(e.x + rnd(0, e.w), e.y + rnd(0, e.h), rnd(-20, 20), rnd(-80, -30), 0.5, '#ff8a30', 2, -20, true);
+  if (e.hp <= 0) { killEnemy(e); return; }
+  if (e.state === 'idle') { e.state = 'chase'; e.face = -dir; }
 }
 let fires = [];
 function updateBombs(dt) {
@@ -1519,6 +1540,8 @@ function updateBombs(dt) {
   bombs = bombs.filter(b => b.life > 0);
   for (const f of fires) {
     f.life -= dt; f.tick -= dt;
+    if (f.y < f.gy) { f.vy += 1400 * dt; f.y = Math.min(f.gy, f.y + f.vy * dt); }
+    for (const e of enemies) { if (e.dead) continue; const t2 = f.et.get(e) || 0; if (t2 > 0) { f.et.set(e, t2 - dt); continue; } if (overlap({ x: f.x, y: f.y - 20, w: f.w, h: 20 }, e)) { f.et.set(e, 0.5); burnEnemy(e, 12 * (e.mul || 1), 1); } }
     if (Math.random() < 0.7) part(f.x + rnd(0, f.w), f.y - 2, rnd(-10, 10), rnd(-90, -40), rnd(0.3, 0.6), '#ff7a2a', 2.5, -30, true);
     if (f.tick <= 0 && overlap({ x: f.x, y: f.y - 20, w: f.w, h: 20 }, P)) { f.tick = 0.5; hitPlayer(10, P.face * -1, 80, {}); }
   }
@@ -2179,7 +2202,7 @@ const BOSSES = [];        // generische Bosse der neuen Welten
 const HOOKS = { update: [], world: [], emissive: [], lights: [], fg: [], reset: [] };
 const KIND_FN = {};       // Gegner-KI je kind
 const DRAW_TYPE = {};     // Zeichenfunktion je Gegnertyp
-const WORLD_ENTRIES = [{ i: 0, need: null, act: 'Akt I' }, { i: 5, need: 'boss2Defeated', act: 'Akt II · Der Giftsumpf', lockText: 'Besiege Vaelra' }, { i: 7, need: 'boss3Defeated', act: 'Akt II · Der Frostgürtel', lockText: 'Besiege Grolmok' }, { i: 9, need: 'flag:boss4', act: 'Akt III · Die Ertrunkene Stadt Velmor', lockText: 'Besiege die Gefrorene Königin' }, { i: 11, need: 'flag:boss5', act: 'Akt III · Der Moderwald', lockText: 'Besiege König Tharn' }, { i: 13, need: 'flag:boss6', act: 'Akt IV · Das Knochenmeer', lockText: 'Besiege die Moderhexe' }];
+const WORLD_ENTRIES = [{ i: 0, need: null, act: 'Akt I · Der Aschenpfad' }, { i: 5, need: 'boss2Defeated', act: 'Akt II · Der Giftsumpf', lockText: 'Besiege Vaelra' }, { i: 7, need: 'boss3Defeated', act: 'Akt II · Der Frostgürtel', lockText: 'Besiege Grolmok' }, { i: 9, need: 'flag:boss4', act: 'Akt III · Die Ertrunkene Stadt Velmor', lockText: 'Besiege die Gefrorene Königin' }, { i: 11, need: 'flag:boss5', act: 'Akt III · Der Moderwald', lockText: 'Besiege König Tharn' }, { i: 13, need: 'flag:boss6', act: 'Akt IV · Das Knochenmeer', lockText: 'Besiege die Moderhexe' }];
 const needMet = n => !n || (n.startsWith('flag:') ? !!world.flags[n.slice(5)] : !!world[n]);
 const activeBoss = () => BOSSES.find(b => b.active && !b.o.dead);
 function resetExtraBosses() { for (const b of BOSSES) if (!world.flags[b.flag]) { b.reset(); b.active = false; } }
@@ -2191,6 +2214,7 @@ function bossDefeated(b, souls, stones, title, rewards) {
     if (!list.includes(id)) { list.push(id); got.push(tab[id].name); }
   }
   victorySub = got.length ? 'Erhalten: ' + got.join(' & ') : 'Der Weg ist frei.';
+  setTimeout(() => { if (gs === 'play') toast('Ein Leuchtfeuer flammt in der Arena auf.', 3); }, 7200);
   flashes.push({ x: P.x, y: P.y, r: 480, c: [255, 220, 170], i: 1.3, life: 1.6, max: 1.6 });
   enemies.forEach(e => { if (e.x > b.arenaX0 && e.x < b.arenaX0 + 30 * T) e.dead = true; });
   save();
@@ -2395,7 +2419,7 @@ BOSSES.push(QB);
 const V_X0 = 789 * T, V_X1 = 957 * T, W_LOW = 16 * T + 8, W_HIGH = 12 * T + 12;
 let waterY = W_LOW, tideHigh = false, tideT = 26, bellHold = 0, inVelmor = false;
 const BELLS = [826, 858, 899].map(x => ({ x: x * T + 16, y: 12 * T, swing: 0 }));
-function velmorWater(x) { return x > V_X0 && x < V_X1; }
+function velmorWater(x) { return x > V_X0 && x < (TB.active ? V_X1 : 929 * T); }
 HOOKS.reset.push(() => { if (activeBoss() !== TB) { waterY = tideHigh ? W_HIGH : W_LOW; } P.breath = P.maxBreath || 7; });
 HOOKS.update.push(dt => {
   inVelmor = P.x > V_X0 - 200 && P.x < V_X1 + 200;
@@ -2435,7 +2459,7 @@ HOOKS.world.push(() => {
 });
 HOOKS.fg.push(() => {
   if (!inVelmor || waterY > 17 * T) return;
-  const x0 = Math.max(0, V_X0 - cam.x), x1 = Math.min(VW, V_X1 - cam.x), y0 = waterY - cam.y;
+  const x0 = Math.max(0, V_X0 - cam.x), x1 = Math.min(VW, (TB.active ? V_X1 : 929 * T) - cam.x), y0 = waterY - cam.y;
   if (x1 <= x0 || y0 > VH) return;
   const g = ctx.createLinearGradient(0, y0, 0, y0 + 160); g.addColorStop(0, 'rgba(26,70,76,0.5)'); g.addColorStop(1, 'rgba(6,22,26,0.82)');
   ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, VH - y0);
@@ -3089,15 +3113,28 @@ function travelTo(i) {
   orbs = []; clouds = []; globs = [];
   cam.x = camFor(P.x); sfx('fire'); save(); closeMenu(); toast(BONFIRES[i].name, 1.8);
 }
-function openPortal(fire) {
+function openPortal(fire, group) {
   gs = 'menu';
+  const back = fire ? openBonfire : closeMenu;
+  // Gebiet eines Leuchtfeuers nach seiner Lage (nicht nach dem Index)
+  const actOf = i => { let a = WORLD_ENTRIES[0].act; for (const e of WORLD_ENTRIES) if (BONFIRES[i].x >= BONFIRES[e.i].x) a = e.act; return a; };
+  const avail = [];
+  BONFIRES.forEach((b, i) => { if (i === HUB || i === world.bonfire || !bfOn(i)) return; const entry = WORLD_ENTRIES.find(e => e.i === i); if (world.lit[i] || (entry && needMet(entry.need))) avail.push(i); });
+  if (group) {
+    const list = avail.filter(i => actOf(i) === group).sort((a, b) => BONFIRES[a].x - BONFIRES[b].x);
+    const items = list.map(i => ({ label: BONFIRES[i].name, info: world.lit[i] ? '' : 'noch nicht entzündet', action: () => travelTo(i) }));
+    items.push({ label: 'Zurück', action: () => openPortal(fire) });
+    openMenu({ title: group.split(' · ')[1] || group, sub: group.split(' · ')[0], style: 'panel', back: () => openPortal(fire), items });
+    return;
+  }
   const items = [];
-  const actOf = i => { let a = 'Akt I'; for (const e of WORLD_ENTRIES) if (i >= e.i) a = e.act; return a; };
-  BONFIRES.forEach((b, i) => { if (i === HUB) return; const entry = WORLD_ENTRIES.find(e => e.i === i); if (world.lit[i] || (entry && needMet(entry.need))) items.push({ label: b.name, info: actOf(i), action: () => travelTo(i) }); });
+  for (const e of WORLD_ENTRIES) {
+    const n = avail.filter(i => actOf(i) === e.act).length;
+    if (n) items.push({ label: e.act.replace(' · ', ' – '), info: n + ' Leuchtfeuer', action: () => openPortal(fire, e.act) });
+  }
   for (const e of WORLD_ENTRIES) if (!needMet(e.need) && !world.lit[e.i]) { items.push({ label: '??? (versiegelt)', info: e.lockText || '', disabled: true }); break; }
-  items.push({ label: 'Bleiben', action: closeMenu });
-  if (fire) { items.pop(); items.push({ label: 'Zurück', action: openBonfire }); }
-  openMenu({ title: fire ? 'Reisen' : 'Das Weltentor', sub: 'Wohin soll dich die Glut tragen?', style: 'panel', back: fire ? openBonfire : closeMenu, items });
+  items.push({ label: fire ? 'Zurück' : 'Bleiben', action: back });
+  openMenu({ title: 'Reisen', sub: 'Wohin soll dich die Glut tragen?', style: 'panel', back, items });
 }
 function drawHubNPCs() {
   if (cam.x < 420 * T) return;
@@ -3138,24 +3175,12 @@ function drawHubNPCs() {
   ctx.fillStyle = '#0a0806'; ctx.beginPath(); ctx.ellipse(3, -37, 3, 4, 0, 0, 7); ctx.fill();
   ctx.fillStyle = '#e8d0a0'; ctx.fillRect(3, -38, 1.5, 1.2);
   ctx.restore();
-  // Weltentor
-  const px2 = PORTAL_X;
-  ctx.fillStyle = '#2e2a30'; ctx.fillRect(px2 - 44, 16 * T - 150, 14, 150); ctx.fillRect(px2 + 30, 16 * T - 150, 14, 150);
-  ctx.strokeStyle = '#2e2a30'; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(px2, 16 * T - 150, 37, Math.PI, 0); ctx.stroke();
-  ctx.fillStyle = '#8a7a58'; ctx.fillRect(px2 - 46, 16 * T - 6, 92, 6);
 }
 function drawHubEmissive() {
   if (cam.x < 420 * T) return;
   const fx = 429 * T;
   radial(fx + 24, 16 * T - 25, 40, '255,120,40', 0.6 + Math.sin(time * 8) * 0.1); flame(fx + 24, 16 * T - 14, 16, 12, 3);
   radial(MERCH_X - 18, 16 * T - 30, 22, '255,200,120', 0.55); ctx.fillStyle = '#ffe0a0'; ctx.fillRect(MERCH_X - 21, 16 * T - 34, 6, 8);
-  const px2 = PORTAL_X;
-  for (let k = 0; k < 5; k++) {
-    const a = time * (0.6 + k * 0.2) + k;
-    ctx.strokeStyle = `rgba(${k % 2 ? '150,120,255' : '255,160,90'},${0.25 + 0.1 * Math.sin(time * 2 + k)})`; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.ellipse(px2, 16 * T - 95, 26 - k * 3, 88 - k * 10, 0, a, a + 4); ctx.stroke();
-  }
-  radial(px2, 16 * T - 95, 70, '170,130,255', 0.35 + 0.08 * Math.sin(time * 3));
 }
 
 // ================================================================ INTERAKTION
@@ -3163,8 +3188,7 @@ function nearInteract() {
   const px = P.x + P.w / 2, feet = P.y + P.h;
   if (Math.abs(px - SMITH_X) < 46 && feet > 15 * T) return { k: 'smith', label: 'Mit Brandt, dem Schmied, sprechen' };
   if (Math.abs(px - MERCH_X) < 46 && feet > 15 * T) return { k: 'merch', label: 'Mit Odila, der Händlerin, sprechen' };
-  if (Math.abs(px - PORTAL_X) < 40 && feet > 15 * T) return { k: 'portal', label: 'Durch das Weltentor reisen' };
-  for (let i = 0; i < BONFIRES.length; i++) { const bf = BONFIRES[i]; if (Math.abs(px - bf.x) < 44 && Math.abs(feet - bf.y) < 10) return { k: 'bonfire', i, label: world.lit[i] ? 'Am Leuchtfeuer rasten' : 'Leuchtfeuer entzünden' }; }
+  for (let i = 0; i < BONFIRES.length; i++) { const bf = BONFIRES[i]; if (bfOn(i) && Math.abs(px - bf.x) < 44 && Math.abs(feet - bf.y) < 10) return { k: 'bonfire', i, label: world.lit[i] ? 'Am Leuchtfeuer rasten' : 'Leuchtfeuer entzünden' }; }
   if (!world.doorOpen && feet > 13 * T && feet < 16 * T + 2 && Math.abs(px - (DOOR_X * T + 16)) < 42) return { k: 'door', label: px > DOOR_X * T + 16 ? 'Tür öffnen' : 'Tür untersuchen' };
   if (!world.bossDefeated && px < FOG_X * T && px > FOG_X * T - 44 && feet > 12 * T) return { k: 'fog', label: 'Durch den Nebel gehen' };
   for (const c of world.chests) if (!c.opened && Math.abs(px - c.x) < 30 && Math.abs(feet - c.y) < 10) return { k: 'chest', c, label: 'Truhe öffnen' };
@@ -3296,16 +3320,16 @@ function openBonfire() {
     { label: 'Stärke', info: () => 'Schaden ×' + P.dmgMul.toFixed(2), action: lv('str') },
     { label: 'Ausrüstung', action: () => openEquip(openBonfire) },
   ];
-  if (world.bonfire !== HUB) items.push({ label: 'Zur Zuflucht reisen', info: 'Schmied · Händlerin · Weltentor', action: () => {
+  if (world.bonfire !== HUB) items.push({ label: 'Zur Zuflucht reisen', info: 'Schmied · Händlerin', action: () => {
     world.bonfire = HUB; resetPlayer(); spawnEnemies(); cam.x = camFor(P.x); sfx('fire'); save(); closeMenu(); toast(BONFIRES[HUB].name, 1.8); } });
-  items.push({ label: 'Zu anderem Leuchtfeuer reisen …', action: () => openPortal(true) });
+  items.push({ label: world.bonfire === HUB ? 'In die Welten reisen …' : 'Zu anderem Leuchtfeuer reisen …', action: () => openPortal(true) });
   items.push({ label: 'Weiterziehen', action: closeMenu });
   openMenu({ title: bf.name, sub: () => `Stufe ${level()}   ·   Seelen ${P.souls}   ·   Nächste Stufe ${lvlCost()}`, style: 'panel', back: closeMenu, items });
 }
 function openEquip(back) {
   const items = [];
-  world.weapons.forEach(id => { const w = WEAPONS[id]; items.push({ label: w.name, group: 'Waffen', info: () => P.weapon === id ? '● angelegt' : '',
-    desc: () => [w.desc, `Leicht: ${w.light.dmg} Schaden · ${w.light.cost} Ausdauer`, `Schwer: ${w.heavy.dmg} Schaden · ${w.heavy.cost} Ausdauer`],
+  world.weapons.forEach(id => { const w = WEAPONS[id], wl = () => (world.wlevel || {})[id] || 0; items.push({ label: w.name + (wl() ? ' +' + wl() : ''), group: 'Waffen', info: () => (P.weapon === id ? '● angelegt  ·  ' : '') + 'Stufe +' + wl() + ' / 5',
+    desc: () => { const m = 1 + 0.08 * wl(); return [w.desc, `Stufe +${wl()} (Schaden ×${m.toFixed(2)})`, `Leicht: ${Math.round(w.light.dmg * m)} Schaden · ${w.light.cost} Ausdauer`, `Schwer: ${Math.round(w.heavy.dmg * m)} Schaden · ${w.heavy.cost} Ausdauer`]; },
     action: () => { P.weapon = id; sfx('swap'); save(); } }); });
   world.armors.forEach(id => { const a = ARMORS[id]; items.push({ label: a.name, group: 'Rüstungen', info: () => P.armor === id ? '● angelegt' : '',
     desc: () => [a.desc, `Schutz ${Math.round(a.def * 100)} %   ·   Standfestigkeit ${a.poise}`, `Gewicht: ${WEIGHT_NAMES[a.weight]}   ·   Rolle ${a.weight === 1 ? 'schnell' : a.weight === 2 ? 'normal' : 'träge'}`],
@@ -3371,7 +3395,7 @@ function loadSlot(i) {
 }
 function startNew(i) {
   slot = i; initWorld(); stats.vit = stats.end = stats.str = 0; P.souls = 0; P.weapon = 'sword'; P.armor = 'wanderer'; P.ring = null;
-  startWorld(); save(); toast('Die Zuflucht – das Weltentor rechts führt zum Pfad', 3.5);
+  startWorld(); save(); toast('Die Zuflucht – raste am Leuchtfeuer, um in die Welten zu reisen', 3.5);
 }
 function startWorld() {
   buildMap(); resetPlayer(); spawnEnemies(); resetBoss(); bossActive = false; resetV(); vActive = false; resetW(); wActive = false; resetExtraBosses(); for (const h of HOOKS.reset) h(); bombs = []; fires = []; orbs = []; clouds = []; globs = [];
@@ -3404,7 +3428,7 @@ function update(dt, I) {
   updateWeather(dt);
   for (const t of TORCHES) if (Math.abs(t.x - cam.x - VW / 2) < VW * 0.7 && Math.random() < 0.25) part(t.x + rnd(-3, 3), t.y - 12, rnd(-10, 10), rnd(-60, -25), rnd(0.4, 0.9), t.c[1] > 200 ? '#80ffa0' : '#ffa040', 1.5, -20, true);
   for (let i = 0; i < BONFIRES.length; i++) {
-    const bf = BONFIRES[i];
+    const bf = BONFIRES[i]; if (!bfOn(i)) continue;
     if (Math.abs(bf.x - cam.x - VW / 2) < VW && Math.random() < 0.45) part(bf.x + rnd(-8, 8), bf.y - 10, rnd(-15, 15), rnd(-80, -30), rnd(0.8, 1.8), world.lit[i] ? '#ffb347' : '#a05020', 2, -10, true);
   }
   if (gs === 'main') {
@@ -3787,8 +3811,8 @@ function drawWorld() {
     ctx.fillStyle = '#2a2622'; ctx.fillRect(t.x - 2, t.y - 6, 4, 18); ctx.fillRect(t.x - 6, t.y + 8, 12, 3);
     ctx.fillStyle = '#4a3a2a'; ctx.fillRect(t.x - 4, t.y - 10, 8, 6);
   }
-  for (const bf of BONFIRES) {
-    if (Math.abs(bf.x - cam.x - VW / 2) > VW) continue;
+  for (const [bi, bf] of BONFIRES.entries()) {
+    if (!bfOn(bi) || Math.abs(bf.x - cam.x - VW / 2) > VW) continue;
     const x = bf.x, y = bf.y;
     ctx.fillStyle = '#3e3a44';
     for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.ellipse(x + k * 8, y - 3, 6, 4, 0, 0, 7); ctx.fill(); }
@@ -3821,7 +3845,7 @@ function drawWorld() {
 function collectLights() {
   const L = [];
   const add = (x, y, r, c, i) => { if (x + r < cam.x - 40 || x - r > cam.x + VW + 40) return; L.push({ x, y, r, c, i }); };
-  BONFIRES.forEach((bf, i) => { const f = world.lit[i] ? 1.25 + Math.sin(time * 11 + i) * 0.08 + Math.sin(time * 23) * 0.05 : 0.5; add(bf.x, bf.y - 20, world.lit[i] ? 340 : 160, [255, 150, 70], f); });
+  BONFIRES.forEach((bf, i) => { if (!bfOn(i)) return; const f = world.lit[i] ? 1.25 + Math.sin(time * 11 + i) * 0.08 + Math.sin(time * 23) * 0.05 : 0.5; add(bf.x, bf.y - 20, world.lit[i] ? 340 : 160, [255, 150, 70], f); });
   for (const t of TORCHES) add(t.x, t.y - 12, 250, t.c, 1.0 + Math.sin(time * 13 + t.x) * 0.07 + Math.sin(time * 29 + t.y) * 0.05);
   if (gs !== 'main' && gs !== 'quit' && P.state !== 'dead') add(P.x + P.w / 2, P.y + 20, 200, [125, 132, 165], 0.7);
   for (const it of world.items) if (!it.taken) add(it.x, it.y - 16, 90, [150, 175, 255], 0.75);
@@ -3882,7 +3906,7 @@ function flame(x, y, h, w, seed, cols) {
 function radial(x, y, r, rgb, a) { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
 function drawEmissive() {
   ctx = sctx; ctx.save(); ctx.globalCompositeOperation = 'lighter'; worldTf(ctx);
-  BONFIRES.forEach((bf, i) => { if (Math.abs(bf.x - cam.x - VW / 2) > VW) return; radial(bf.x, bf.y - 16, 60, '255,140,60', world.lit[i] ? 0.35 : 0.12); flame(bf.x, bf.y - 6, world.lit[i] ? 30 : 9, 12, i); });
+  BONFIRES.forEach((bf, i) => { if (!bfOn(i) || Math.abs(bf.x - cam.x - VW / 2) > VW) return; radial(bf.x, bf.y - 16, 60, '255,140,60', world.lit[i] ? 0.35 : 0.12); flame(bf.x, bf.y - 6, world.lit[i] ? 30 : 9, 12, i); });
   for (const t of TORCHES) { if (Math.abs(t.x - cam.x - VW / 2) > VW) continue; radial(t.x, t.y - 14, 30, t.c.join(','), 0.3); flame(t.x, t.y - 9, 15, 5.5, t.x, t.f); }
   for (const it of world.items) if (!it.taken) { const yy = it.y - 16 + Math.sin(time * 3 + it.x) * 3; radial(it.x, yy, 18, '200,215,255', 0.9); radial(it.x, yy, 5, '255,255,255', 1); }
   if (world.stain) { const s = world.stain, yy = s.y - 12 + Math.sin(time * 4) * 2; radial(s.x, yy, 20, '120,255,160', 0.85); radial(s.x, yy, 5, '230,255,235', 1); }
