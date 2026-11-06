@@ -20,7 +20,7 @@ docker run -d --name aschenpfad -p 8080:8080 --restart unless-stopped aschenpfad
 Ohne Docker geht es auch direkt mit Node.js (ab Version 18):
 
 ```bash
-node server/server.js        # nutzt ../index.html? -> GAME_FILE setzen:
+# im Repo-Ordner:
 GAME_FILE=./index.html node server/server.js
 ```
 
