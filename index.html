@@ -867,7 +867,7 @@ function renderTileRange(x, TX0, TX1) {
 // ================================================================ EINGABE
 const keys = {}, pressed = {}, mouse = { x: 0, y: 0, moved: false };
 addEventListener('keydown', e => {
-  initAudio();
+  initAudio(); lastKey = (e.code || '?') + '/' + (e.key || '?') + '/' + e.keyCode;
   if (!keys[e.code]) pressed[e.code] = true; keys[e.code] = true;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'ShiftLeft'].includes(e.code)) e.preventDefault();
 });
@@ -878,7 +878,19 @@ addEventListener('mousedown', e => { if (e.target && e.target.id === 'fs') retur
 addEventListener('mousemove', e => { mouseToCanvas(e); mouse.moved = true; });
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('wheel', e => { if (menu) { pressed[e.deltaY > 0 ? 'ArrowDown' : 'ArrowUp'] = true; e.preventDefault(); } }, { passive: false });
-let padPrev = [], padNow = [];
+let padPrev = [], padNow = [], padIdx = -1, padDiag = '', padEvents = 0, lastKey = '–';
+// Nimmt den zuletzt benutzten verbundenen Controller (nicht nur Slot 0 – z. B. Switch Pro landet oft auf Slot 1)
+function activePad() {
+  let pads = []; if (!navigator.getGamepads) { padDiag = 'Gamepad-API fehlt in diesem Browser'; return null; }
+  try { pads = navigator.getGamepads(); } catch (err) { padDiag = 'Gamepad-API blockiert: ' + (err.name || err); return null; }
+  const list = [...pads].filter(Boolean); padDiag = list.length ? list.map(g => '#' + g.index + ' ' + g.id.slice(0, 34) + ' [' + (g.mapping || 'kein Mapping') + '] Tasten:' + g.buttons.map((b, i) => b.pressed ? i : null).filter(v => v !== null).join(',') + ' Achsen:' + [...g.axes].slice(0, 4).map(v => v.toFixed(1)).join('/')).join('  |  ') : 'Kein Controller sichtbar (Taste drücken) · Events: ' + padEvents;
+  let best = null;
+  for (const g of pads) if (g && g.connected !== false && (!best || g.timestamp > best.timestamp)) best = g;
+  if (best && best.index !== padIdx) { padIdx = best.index; padPrev = []; if (typeof toast === 'function') toast('Controller: ' + best.id.replace(/\s*\(.*$/, '').slice(0, 40), 2.5); }
+  return best;
+}
+addEventListener('gamepadconnected', e => { padEvents++; initAudio && initAudio(); if (typeof toast === 'function') toast('Controller verbunden – drücke eine Taste', 2.5); });
+addEventListener('gamepaddisconnected', e => { if (e.gamepad.index === padIdx) padIdx = -1; });
 function readInput() {
   const k = c => !!keys[c], p = c => !!pressed[c];
   const I = {
@@ -892,13 +904,13 @@ function readInput() {
     confirm: p('Enter') || p('Space') || p('KeyJ'), back: p('Escape') || p('Backspace') || p('KeyE'),
     click: p('Mouse0'), start: p('Enter'), esc: p('Escape'), any: Object.keys(pressed).length > 0,
   };
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const gp = pads && pads[0];
+  const gp = activePad();
   padNow = [];
   if (gp) {
     padNow = gp.buttons.map(b => b.pressed);
     const b = i => !!padNow[i], e = i => !!padNow[i] && !padPrev[i];
-    const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    let ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    if (gp.mapping !== 'standard' && gp.axes.length > 9) { const h = gp.axes[9]; if (h > -1.1 && h < 1.1) { const d = Math.round((h + 1) / (2 / 7)); /* 0=oben,1=ob-re,2=re,3=un-re,4=unten,5=un-li,6=li,7=ob-li */ if (d === 0 || d === 1 || d === 7) padNow[12] = true; if (d >= 3 && d <= 5) padNow[13] = true; if (d >= 5 && d <= 7) padNow[14] = true; if (d >= 1 && d <= 3) padNow[15] = true; } }
     if (ax < -0.35 || b(14)) I.left = true;
     if (ax > 0.35 || b(15)) I.right = true;
     if (b(0)) I.jumpHeld = true;
@@ -3077,14 +3089,15 @@ function travelTo(i) {
   orbs = []; clouds = []; globs = [];
   cam.x = camFor(P.x); sfx('fire'); save(); closeMenu(); toast(BONFIRES[i].name, 1.8);
 }
-function openPortal() {
+function openPortal(fire) {
   gs = 'menu';
   const items = [];
   const actOf = i => { let a = 'Akt I'; for (const e of WORLD_ENTRIES) if (i >= e.i) a = e.act; return a; };
   BONFIRES.forEach((b, i) => { if (i === HUB) return; const entry = WORLD_ENTRIES.find(e => e.i === i); if (world.lit[i] || (entry && needMet(entry.need))) items.push({ label: b.name, info: actOf(i), action: () => travelTo(i) }); });
   for (const e of WORLD_ENTRIES) if (!needMet(e.need) && !world.lit[e.i]) { items.push({ label: '??? (versiegelt)', info: e.lockText || '', disabled: true }); break; }
   items.push({ label: 'Bleiben', action: closeMenu });
-  openMenu({ title: 'Das Weltentor', sub: 'Wohin soll dich die Glut tragen?', style: 'panel', back: closeMenu, items });
+  if (fire) { items.pop(); items.push({ label: 'Zurück', action: openBonfire }); }
+  openMenu({ title: fire ? 'Reisen' : 'Das Weltentor', sub: 'Wohin soll dich die Glut tragen?', style: 'panel', back: fire ? openBonfire : closeMenu, items });
 }
 function drawHubNPCs() {
   if (cam.x < 420 * T) return;
@@ -3283,8 +3296,9 @@ function openBonfire() {
     { label: 'Stärke', info: () => 'Schaden ×' + P.dmgMul.toFixed(2), action: lv('str') },
     { label: 'Ausrüstung', action: () => openEquip(openBonfire) },
   ];
-  BONFIRES.forEach((b, i) => { if (i !== world.bonfire && (world.lit[i] || i === 0)) items.push({ label: 'Reisen', info: b.name, action: () => {
-    world.bonfire = i; resetPlayer(); spawnEnemies(); cam.x = camFor(P.x); sfx('fire'); save(); closeMenu(); toast(b.name, 1.8); } }); });
+  if (world.bonfire !== HUB) items.push({ label: 'Zur Zuflucht reisen', info: 'Schmied · Händlerin · Weltentor', action: () => {
+    world.bonfire = HUB; resetPlayer(); spawnEnemies(); cam.x = camFor(P.x); sfx('fire'); save(); closeMenu(); toast(BONFIRES[HUB].name, 1.8); } });
+  items.push({ label: 'Zu anderem Leuchtfeuer reisen …', action: () => openPortal(true) });
   items.push({ label: 'Weiterziehen', action: closeMenu });
   openMenu({ title: bf.name, sub: () => `Stufe ${level()}   ·   Seelen ${P.souls}   ·   Nächste Stufe ${lvlCost()}`, style: 'panel', back: closeMenu, items });
 }
@@ -4299,6 +4313,8 @@ function drawMenu() {
     ctx.save(); ctx.shadowColor = 'rgba(255,150,60,0.55)'; ctx.shadowBlur = 24;
     text('ASCHENPFAD', 96, 150, 66, '#e8d8b0', 'left', undefined, 6); ctx.restore();
     text('Ein 2D-Souls-Prototyp  ·  v0.9', 100, 200, 16, '#8a8070', 'left', undefined, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(10, 496, 940, 40);
+    text('Controller-Test: ' + (padDiag || 'noch nicht abgefragt'), 20, 512, 13, '#e8dcc0', 'left'); text('Letzte Taste: ' + lastKey + '  ·  Permissions-Policy gamepad: ' + (document.featurePolicy ? String(document.featurePolicy.allowsFeature('gamepad')) : '?'), 20, 529, 13, '#e8dcc0', 'left');
     m.items.forEach((it, i) => {
       const y = 270 + i * 42, sel = i === m.sel;
       const col = it.disabled ? '#45403a' : sel ? '#ffd27a' : '#cfc6b6';
