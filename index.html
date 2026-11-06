@@ -21,7 +21,7 @@ canvas{width:960px;height:540px;outline:none;display:block;cursor:crosshair}
 // =====================================================================
 //  ASCHENPFAD – 2D Souls-like  (v0.15.2)
 // =====================================================================
-const VW = 960, VH = 540, T = 32, W = 1301, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
+const VW = 960, VH = 540, T = 32, W = 1481, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const approach = (v, t, d) => v < t ? Math.min(v + d, t) : Math.max(v - d, t);
 const lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
@@ -568,22 +568,26 @@ const BONFIRES = [
   { x: 943 * T + 16, y: 16 * T, name: 'Tharns Halle', need: 'flag:boss5' },
   { x: 1114 * T + 16, y: 16 * T, name: 'Ysras Lichtung', need: 'flag:boss6' },
   { x: 1286 * T + 16, y: 16 * T, name: 'Asche des Ersten', need: 'flag:boss7' },
+  // Akt II · Die Nebelklamm (Verbindung Giftsumpf → Frostgürtel)
+  { x: 1305 * T + 16, y: 16 * T, name: 'Klammgrund' },
+  { x: 1392 * T + 16, y: 16 * T, name: 'Nebelschwelle' },
+  { x: 1475 * T + 16, y: 16 * T, name: 'Klammpass', need: 'flag:klamm' },
 ];
 const bfOn = i => !BONFIRES[i].need || needMet(BONFIRES[i].need);
 // Regionen = voneinander getrennte Kartenabschnitte (Kamera bleibt darin)
-const REGIONS = [[0, 424], [426, 462], [462, 625], [626, 788], [789, 958], [959, 1130], [1131, 1300]];
+const REGIONS = [[0, 424], [426, 462], [462, 625], [626, 788], [789, 958], [959, 1130], [1131, 1300], [1302, 1480]];
 function regionOf(px) { const tx = px / T; for (const r of REGIONS) if (tx >= r[0] && tx < r[1]) return r; return REGIONS[0]; }
 function camFor(px) { const r = regionOf(px); return clamp(px - VW / 2, r[0] * T, Math.max(r[0] * T, r[1] * T - VW)); }
 const FOG3_X = 592, ARENA3_X0 = 593 * T, SWAMP_X0 = 462;
-const SPORES = [[491, 14, 80], [541, 14, 70], [550, 14, 80], [580, 13, 70], [516, 13, 60]].map(([x, y, r]) => ({ x: x * T, y: y * T, r }));
+const SPORES = [[491, 14, 80], [541, 14, 70], [550, 14, 80], [580, 13, 70], [516, 13, 60], [1325, 14, 70], [1358, 13, 70], [1383, 14, 60]].map(([x, y, r]) => ({ x: x * T, y: y * T, r }));
 let clouds = [];
-const WARM = [[673, 16], [686, 16], [762, 16], [770, 16]].map(([x, y]) => ({ x: x * T + 16, y: y * T }));
+const WARM = [[673, 16], [686, 16], [762, 16], [770, 16], [1416, 16], [1441, 16], [1460, 16]].map(([x, y]) => ({ x: x * T + 16, y: y * T }));
 let shards = [], snow = [];
 const HUB = 4, SMITH_X = 432 * T + 16, MERCH_X = 452 * T + 16, PORTAL_X = 458 * T + 16;
 const FOG2_X = 392, ARENA2_X0 = 393 * T, KDOOR_X = 283;
 const TORCHES = [[17, 13], [29, 12], [41, 13], [47, 13], [64, 12], [78, 11], [84, 9], [107, 9], [113, 12], [125, 12], [137, 8], [151, 7], [161, 12], [171, 7], [181, 12], [194, 12],
   [306, 12], [318, 9], [330, 12], [344, 8], [361, 12], [371, 8], [383, 12], [390, 11], [396, 9], [420, 9], [428, 10], [438, 10], [448, 10], [455, 10],
-  [469, 12], [496, 10], [528, 8], [534, 8], [558, 10], [575, 10], [589, 11], [596, 9], [619, 9]]
+  [469, 12], [496, 10], [528, 8], [534, 8], [558, 10], [575, 10], [589, 11], [596, 9], [619, 9], [1304, 13], [1350, 11], [1376, 12], [1391, 12]]
   .map(([x, y]) => ({ x: x * T + 16, y: y * T + 16, c: [255, 140, 60], f: ['200,60,20', '255,140,40', '255,235,160'] }))
   .concat([[204, 11], [214, 11], [229, 10], [244, 8], [252, 5], [261, 13], [268, 8], [279, 8], [288, 9], [297, 6]]
   .map(([x, y]) => ({ x: x * T + 16, y: y * T + 16, c: [110, 255, 150], f: ['30,140,60', '80,230,120', '200,255,210'] })));
@@ -599,6 +603,8 @@ const ITEM_DEFS = [
   { x: 845 * T, y: 16 * T, souls: 1500 }, { x: 874 * T, y: 16 * T, souls: 0, stones: 4 }, { x: 908 * T, y: 16 * T, souls: 1700 }, { x: 922 * T, y: 12 * T, souls: 0, stones: 3 },
   { x: 984.5 * T, y: 11 * T, souls: 1800 }, { x: 1031.5 * T, y: 12 * T, souls: 0, stones: 4 }, { x: 1068 * T, y: 12 * T, souls: 2000 }, { x: 1097 * T, y: 16 * T, souls: 0, stones: 4 },
   { x: 1156.5 * T, y: 11 * T, souls: 2200 }, { x: 1168 * T, y: 14 * T, souls: 0, stones: 4 }, { x: 1237.5 * T, y: 11 * T, souls: 2600 }, { x: 1247.5 * T, y: 13 * T, souls: 0, stones: 5 }, { x: 1268 * T, y: 16 * T, souls: 3000 },
+  { x: 1314 * T, y: 13 * T, souls: 0, stones: 2 }, { x: 1332 * T, y: 10 * T, souls: 1000 }, { x: 1354 * T, y: 12 * T, souls: 0, stones: 3 }, { x: 1367 * T, y: 10 * T, souls: 1150 },
+  { x: 1400.5 * T, y: 13 * T, souls: 1250 }, { x: 1429 * T, y: 10 * T, souls: 0, stones: 3 }, { x: 1436.5 * T, y: 12 * T, souls: 1350 }
 ];
 const CHEST_DEFS = [
   { x: 148 * T + 16, y: 10 * T, item: 'weapon:axe' }, { x: 174 * T + 4, y: 10 * T, item: 'flask' },
@@ -742,6 +748,19 @@ function buildMap() {
   f(1203, 16, 1240, 16, 's'); f(1210, 13, 1213, 13, 'n'); f(1220, 14, 1221, 15, '#'); f(1228, 13, 1231, 13, 'n'); f(1236, 11, 1239, 11, 'n'); f(1233, 14, 1233, 15, '#');
   f(1246, 13, 1249, 13, '#'); f(1258, 13, 1261, 13, '#'); f(1266, 16, 1269, 16, 's');
   f(1271, 1, 1271, 11, '#'); f(1271, 12, 1271, 15, 'A');
+  // --- Akt II: Die Nebelklamm – Faulgrund (Sumpf) und Nebelschwelle (Frost)
+  f(1300, 0, 1301, 16, '#');
+  f(1308, 15, 1309, 15, '#'); f(1311, 15, 1318, 15, 'w'); f(1313, 13, 1315, 13, 'b');
+  f(1321, 14, 1323, 15, 'b'); f(1326, 12, 1329, 12, 'b'); f(1331, 10, 1333, 10, 'b');
+  f(1336, 15, 1347, 15, 'w'); f(1338, 13, 1340, 13, 'b'); f(1343, 13, 1345, 13, 'b');
+  f(1350, 14, 1350, 15, '#'); f(1352, 12, 1356, 12, '#'); f(1354, 15, 1356, 15, '^');
+  f(1360, 15, 1368, 15, 'w'); f(1362, 12, 1364, 12, 'b'); f(1366, 10, 1368, 10, 'b');
+  f(1372, 14, 1374, 15, 'b'); f(1377, 15, 1384, 15, 'w'); f(1379, 13, 1381, 13, 'b');
+  f(1388, 15, 1389, 15, '#');
+  f(1396, 16, 1406, 16, 'i'); f(1399, 13, 1402, 13, 'i');
+  f(1408, 14, 1408, 15, '#'); f(1410, 11, 1414, 11, 'i');
+  f(1419, 16, 1430, 16, 'i'); f(1422, 13, 1425, 13, '#'); f(1427, 10, 1430, 10, 'i');
+  f(1433, 14, 1433, 15, '#'); f(1435, 12, 1438, 12, '#');
   f(W - 1, 0, W - 1, 16, '#');
   SPIKES = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (map[y][x] === '^') SPIKES.push([x, y]);
   renderTiles();
@@ -794,7 +813,7 @@ function renderTileRange(x, TX0, TX1) {
   for (let ty = 0; ty < H; ty++) for (let tx = TX0; tx <= TX1; tx++) {
     const c = map[ty][tx], px = tx * T, py = ty * T;
     if (c === '#') {
-      x.fillStyle = tx > 1130 ? patBones : tx > 958 ? patModer : tx > 788 ? patVelmor : tx > 625 ? patFrost : tx > 461 ? patSwamp : tx > 423 ? patRuins : tx > 299 ? patCitadel : tx > 196 ? patCrypt : tx > 111 ? patChapel : patRuins; x.fillRect(px, py, T, T);
+      x.fillStyle = tx > 1390 ? patFrost : tx > 1300 ? patSwamp : tx > 1130 ? patBones : tx > 958 ? patModer : tx > 788 ? patVelmor : tx > 625 ? patFrost : tx > 461 ? patSwamp : tx > 423 ? patRuins : tx > 299 ? patCitadel : tx > 196 ? patCrypt : tx > 111 ? patChapel : patRuins; x.fillRect(px, py, T, T);
       if (!sol(tx, ty - 1)) {
         x.fillStyle = 'rgba(225,230,245,0.18)'; x.fillRect(px, py, T, 2);
         x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(px, py + 2, T, 1);
@@ -994,10 +1013,10 @@ function updateWeather(dt) {
   if (thunderT > 0) { thunderT -= dt; if (thunderT <= 0) { sfx('thunder'); shake = Math.max(shake, 2); } }
   lightning = Math.max(0, lightning - dt * 2.2);
 }
-const ZONES = [['ruins', -1e9, 110 * T], ['chapel', 110 * T, 196.5 * T], ['crypt', 196.5 * T, 300 * T], ['citadel', 300 * T, 424.5 * T], ['hub', 424.5 * T, 461.5 * T], ['swamp', 461.5 * T, 625.5 * T], ['frost', 625.5 * T, 788.5 * T], ['velmor', 788.5 * T, 958.5 * T], ['moder', 958.5 * T, 1130.5 * T], ['bones', 1130.5 * T, 1e9]];
+const ZONES = [['ruins', -1e9, 110 * T], ['chapel', 110 * T, 196.5 * T], ['crypt', 196.5 * T, 300 * T], ['citadel', 300 * T, 424.5 * T], ['hub', 424.5 * T, 461.5 * T], ['swamp', 461.5 * T, 625.5 * T], ['frost', 625.5 * T, 788.5 * T], ['velmor', 788.5 * T, 958.5 * T], ['moder', 958.5 * T, 1130.5 * T], ['bones', 1130.5 * T, 1301 * T], ['swamp', 1301 * T, 1390.5 * T], ['frost', 1390.5 * T, 1e9]];
 function areaW() {
   const cx = cam.x + VW / 2, r = {}; let sum = 0;
-  for (const [n, a, b] of ZONES) { const w = smooth(a - 4 * T, a + 4 * T, cx) * (1 - smooth(b - 4 * T, b + 4 * T, cx)); r[n] = w; sum += w; }
+  for (const [n, a, b] of ZONES) { const w = smooth(a - 4 * T, a + 4 * T, cx) * (1 - smooth(b - 4 * T, b + 4 * T, cx)); r[n] = (r[n] || 0) + w; sum += w; }
   for (const n in r) r[n] /= sum || 1;
   return r;
 }
@@ -1075,6 +1094,7 @@ const RINGS = {
   spore: { name: 'Sporenring', desc: 'Regeneriert langsam Leben (1 / s).' },
   pearl: { name: 'Perlenring', desc: 'Doppelter Atem unter Wasser.' },
   ember: { name: 'Glutkernring', desc: 'Ein Rest Glut. −70 % Kälteaufnahme.' },
+  klammring: { name: 'Ring des Klammwächters', desc: 'Moos und Reif. −40 % Gift- und Kälteaufnahme.' },
 };
 const WEIGHT_NAMES = { 1: 'leicht', 2: 'mittel', 3: 'schwer' };
 const ROLLS = {
@@ -1191,8 +1211,8 @@ function recalcStats() {
   P.roll = ROLLS[A.weight]; P.stMul = (A.stRegen || 1) * (A.weight === 3 ? 0.9 : 1) * (rg === 'stamina' ? 1.12 : 1);
   P.def = Math.min(0.75, A.def + (rg === 'iron' ? 0.1 : 0)); P.poiseMax = A.poise + (rg === 'iron' ? 1 : 0);
   P.soulMul = (A.souls || 1) * (rg === 'soul' ? 1.25 : 1);
-  P.poisonRes = Math.min(0.9, (A.poisonRes || 0) + (rg === 'antidote' ? 0.7 : 0));
-  P.coldRes = Math.min(0.9, (A.coldRes || 0) + (rg === 'ember' ? 0.7 : 0));
+  P.poisonRes = Math.min(0.9, (A.poisonRes || 0) + (rg === 'antidote' ? 0.7 : rg === 'klammring' ? 0.4 : 0));
+  P.coldRes = Math.min(0.9, (A.coldRes || 0) + (rg === 'ember' ? 0.7 : rg === 'klammring' ? 0.4 : 0));
   P.maxBreath = 7 * (A.breath || 1) * (rg === 'pearl' ? 2 : 1); if (P.breath === undefined || P.breath > P.maxBreath) P.breath = P.maxBreath;
   if (P.hp > P.maxHp) P.hp = P.maxHp;
 }
@@ -1493,6 +1513,11 @@ const ETYPES = {
   icecaster: { w: 22, h: 50, hp: 120, speed: 0, detect: 470, souls: 560, poiseMax: 0, kind: 'iceshooter', attacks: [{ wind: 0.9, act: 0.05, rec: 0.6, dmg: 22, cold: 30, range: 470 }] },
   golem: { w: 46, h: 72, hp: 440, speed: 34, detect: 320, souls: 1300, poiseMax: 10, kind: 'melee',
     attacks: [{ wind: 1.0, act: 0.18, rec: 1.0, dmg: 50, cold: 40, reach: 80, step: 80, up: -2.4, end: 1.4, range: 60, wave: true, ice: true }, { wind: 0.7, act: 0.2, rec: 0.8, dmg: 36, cold: 25, reach: 90, step: 200, up: -1.0, end: 1.5, range: 80 }] },
+  klammwaechter: { w: 56, h: 92, hp: 3600, speed: 46, detect: 400, souls: 6000, poiseMax: 18, kind: 'melee', mini: true, flag: 'klamm', name: 'Hrodvar, der Klammwächter',
+    attacks: [
+      { wind: 1.05, act: 0.2, rec: 0.95, dmg: 52, cold: 40, reach: 104, step: 80, up: -2.5, end: 1.4, range: 74, wave: true, ice: true },
+      { wind: 0.7, act: 0.22, rec: 0.8, dmg: 40, tox: 30, reach: 116, step: 220, up: -1.0, end: 1.5, range: 100 },
+      { wind: 0.6, act: 0.24, rec: 0.85, dmg: 36, cold: 25, reach: 124, step: 440, up: 0.05, end: 0.05, range: 170 }] },
   archer: { w: 20, h: 44, hp: 45, speed: 0, detect: 470, souls: 70, poiseMax: 0, kind: 'archer',
     attacks: [{ wind: 0.85, act: 0.05, rec: 0.5, dmg: 14, range: 470 }] },
 };
@@ -1538,13 +1563,20 @@ const SPAWNS = [
   { t: 'skeleton', x: 1146 * T, y: 16 * T }, { t: 'scarab', x: 1152 * T, y: 16 * T }, { t: 'scarab', x: 1153.5 * T, y: 16 * T }, { t: 'skeleton', x: 1160 * T, y: 16 * T }, { t: 'ashpriest', x: 1169 * T, y: 14 * T },
   { t: 'skeleton', x: 1178 * T, y: 16 * T }, { t: 'scarab', x: 1185 * T, y: 16 * T }, { t: 'scarab', x: 1186 * T, y: 16 * T }, { t: 'ashpriest', x: 1192.5 * T, y: 14 * T },
   { t: 'skeleton', x: 1207 * T, y: 16 * T }, { t: 'scarab', x: 1215 * T, y: 16 * T }, { t: 'scarab', x: 1216 * T, y: 16 * T }, { t: 'colossus', x: 1225 * T, y: 16 * T }, { t: 'ashpriest', x: 1237.5 * T, y: 11 * T },
+  // Nebelklamm
+  { t: 'leech', x: 1314 * T, y: 16 * T }, { t: 'leech', x: 1317 * T, y: 16 * T }, { t: 'bloat', x: 1322 * T, y: 14 * T }, { t: 'frog', x: 1328 * T, y: 16 * T }, { t: 'shaman', x: 1332 * T, y: 10 * T },
+  { t: 'swampknight', x: 1335 * T, y: 16 * T }, { t: 'leech', x: 1339 * T, y: 16 * T }, { t: 'leech', x: 1342 * T, y: 16 * T }, { t: 'leech', x: 1346 * T, y: 16 * T }, { t: 'shaman', x: 1353 * T, y: 12 * T },
+  { t: 'frog', x: 1358 * T, y: 16 * T }, { t: 'swampknight', x: 1364 * T, y: 16 * T }, { t: 'bloat', x: 1367 * T, y: 10 * T }, { t: 'leech', x: 1380 * T, y: 16 * T }, { t: 'swampknight', x: 1385 * T, y: 16 * T },
+  { t: 'wolf', x: 1398 * T, y: 16 * T }, { t: 'wolf', x: 1400 * T, y: 16 * T }, { t: 'icecaster', x: 1401 * T, y: 13 * T }, { t: 'frostling', x: 1406 * T, y: 16 * T }, { t: 'icecaster', x: 1412 * T, y: 11 * T },
+  { t: 'golem', x: 1420 * T, y: 16 * T }, { t: 'frostling', x: 1424 * T, y: 13 * T }, { t: 'wolf', x: 1428 * T, y: 16 * T }, { t: 'icecaster', x: 1429 * T, y: 10 * T }, { t: 'frostling', x: 1436 * T, y: 12 * T },
+  { t: 'klammwaechter', x: 1468 * T, y: 16 * T },
   { t: 'skeleton', x: 1244 * T, y: 16 * T }, { t: 'colossus', x: 1253 * T, y: 16 * T }, { t: 'ashpriest', x: 1259.5 * T, y: 13 * T }, { t: 'skeleton', x: 1263 * T, y: 16 * T },
 ];
 let enemies = [];
 function spawnEnemies() {
-  enemies = SPAWNS.filter(s => !(s.t === 'brute' && world.bruteDead)).map(makeEnemy);
+  enemies = SPAWNS.filter(s => !(s.t === 'brute' && world.bruteDead) && !(ETYPES[s.t].flag && world.flags[ETYPES[s.t].flag])).map(makeEnemy);
 }
-function zoneIdx(x) { const tx = x / T; return tx < 112 ? 0 : tx < 197 ? 1 : tx < 300 ? 2 : tx < 462 ? 3 : tx < 626 ? 4 : tx < 789 ? 5 : tx < 959 ? 6 : tx < 1131 ? 7 : 8; }
+function zoneIdx(x) { const tx = x / T; if (tx >= 1390) return 5; if (tx >= 1301) return 4; return tx < 112 ? 0 : tx < 197 ? 1 : tx < 300 ? 2 : tx < 462 ? 3 : tx < 626 ? 4 : tx < 789 ? 5 : tx < 959 ? 6 : tx < 1131 ? 7 : 8; }
 function makeEnemy(s) {
     const d = ETYPES[s.t];
     const z = zoneIdx(s.x), hm = d.mini ? 1 : [1, 1.35, 1.9, 2.5, 2.8, 2.95, 3.1, 3.25, 3.4][z], dm = [1, 1.12, 1.3, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0][z];
@@ -1705,7 +1737,11 @@ function killEnemy(e) {
   e.dead = true; gainSouls(e.def.souls * (e.soulMul || 1) * (P0.soulMul || 1));
   const drop = e.def.mini ? 3 : e.type === 'knight' ? (Math.random() < 0.35 ? 1 : 0) : (Math.random() < 0.06 ? 1 : 0);
   if (drop) { world.stones = (world.stones || 0) + drop; floatText(e.x + e.w / 2, e.y - 20, '+' + drop + ' Schmiedestein', '#c8d8ff'); } soulBurst(e.x + e.w / 2, e.y + e.h / 2);
-  if (e.def.mini) {
+  if (e.def.flag) {
+    world.flags[e.def.flag] = true; world.stones = (world.stones || 0) + 3; victoryT = 6; victoryTitle = 'KLAMMWÄCHTER BEZWUNGEN'; victorySub = 'Ein Leuchtfeuer flammt auf – der Frostgürtel ist offen.';
+    if (!world.rings.includes('klammring') && RINGS.klammring) { world.rings.push('klammring'); victorySub = 'Erhalten: ' + RINGS.klammring.name + '  ·  Der Frostgürtel ist offen.'; }
+    flashes.push({ x: e.x + e.w / 2, y: e.y + 40, r: 420, c: [170, 225, 255], i: 1.3, life: 1.4, max: 1.4 }); sfx('level'); save();
+  } else if (e.def.mini) {
     world.bruteDead = true; world.hasKey = true; victoryT = 5; victorySub = 'Erhalten: Turmschlüssel'; victoryTitle = 'GRABWÄCHTER BEZWUNGEN';
     flashes.push({ x: e.x + e.w / 2, y: e.y + 30, r: 360, c: [140, 255, 170], i: 1.2, life: 1.2, max: 1.2 }); sfx('level'); save();
   }
@@ -2215,7 +2251,7 @@ function hurtW(dmg, dir, d) {
     w.dead = true; w.hp = 0; world.boss3Defeated = true; wActive = false; gainSouls(9000); world.stones = (world.stones || 0) + 6; victoryT = 7; sfx('level');
     victoryTitle = 'MOORSCHLUND BEZWUNGEN';
     const got = []; if (!world.weapons.includes('scythe')) { world.weapons.push('scythe'); got.push('Moorsense'); }
-    victorySub = (got.length ? 'Erhalten: ' + got.join(', ') + '  ·  ' : '') + 'Akt II – Fortsetzung folgt …';
+    victorySub = (got.length ? 'Erhalten: ' + got.join(', ') + '  ·  ' : '') + 'Der Weg in die Nebelklamm ist offen.';
     for (let i = 0; i < 120; i++) part(w.gx + rnd(-30, 30), 16 * T - rnd(0, 170), rnd(-100, 100), rnd(-260, -30), rnd(0.8, 2.4), i % 3 ? '#a8ff6a' : '#f0ffd0', rnd(2, 4), -30, true);
     flashes.push({ x: w.gx, y: 16 * T - 80, r: 480, c: [160, 255, 100], i: 1.4, life: 1.8, max: 1.8 });
     globs = []; enemies.forEach(e => { if (e.x > ARENA3_X0) e.dead = true; }); save(); return;
@@ -2257,7 +2293,7 @@ const BOSSES = [];        // generische Bosse der neuen Welten
 const HOOKS = { update: [], world: [], emissive: [], lights: [], fg: [], reset: [] };
 const KIND_FN = {};       // Gegner-KI je kind
 const DRAW_TYPE = {};     // Zeichenfunktion je Gegnertyp
-const WORLD_ENTRIES = [{ i: 0, need: null, act: 'Akt I · Der Aschenpfad' }, { i: 5, need: 'boss2Defeated', act: 'Akt II · Der Giftsumpf', lockText: 'Besiege Vaelra' }, { i: 7, need: 'boss3Defeated', act: 'Akt II · Der Frostgürtel', lockText: 'Besiege Grolmok' }, { i: 9, need: 'flag:boss4', act: 'Akt III · Die Ertrunkene Stadt Velmor', lockText: 'Besiege die Gefrorene Königin' }, { i: 11, need: 'flag:boss5', act: 'Akt III · Der Moderwald', lockText: 'Besiege König Tharn' }, { i: 13, need: 'flag:boss6', act: 'Akt IV · Das Knochenmeer', lockText: 'Besiege die Moderhexe' }];
+const WORLD_ENTRIES = [{ i: 0, need: null, act: 'Akt I · Der Aschenpfad' }, { i: 5, need: 'boss2Defeated', act: 'Akt II · Der Giftsumpf', lockText: 'Besiege Vaelra' }, { i: 21, need: 'boss3Defeated', act: 'Akt II · Die Nebelklamm', lockText: 'Besiege Grolmok' }, { i: 7, need: 'flag:klamm', act: 'Akt II · Der Frostgürtel', lockText: 'Bezwinge den Klammwächter' }, { i: 9, need: 'flag:boss4', act: 'Akt III · Die Ertrunkene Stadt Velmor', lockText: 'Besiege die Gefrorene Königin' }, { i: 11, need: 'flag:boss5', act: 'Akt III · Der Moderwald', lockText: 'Besiege König Tharn' }, { i: 13, need: 'flag:boss6', act: 'Akt IV · Das Knochenmeer', lockText: 'Besiege die Moderhexe' }];
 const needMet = n => !n || (n.startsWith('flag:') ? !!world.flags[n.slice(5)] : !!world[n]);
 const activeBoss = () => BOSSES.find(b => b.active && !b.o.dead);
 function resetExtraBosses() { for (const b of BOSSES) if (!world.flags[b.flag]) { b.reset(); b.active = false; } }
@@ -2347,6 +2383,14 @@ DRAW_TYPE.icecaster = (e, c) => {
   ctx.fillStyle = '#e8f8ff'; ctx.beginPath(); ctx.moveTo(11, -64 - lift * 6); ctx.lineTo(15, -55 - lift * 6); ctx.lineTo(11, -48 - lift * 6); ctx.lineTo(7, -55 - lift * 6); ctx.fill();
   localGlow(11, -56 - lift * 6, 12 + lift * 18, '170,230,255', 0.9);
   if (lift > 0) for (let k = 0; k < 3; k++) { const a = time * 4 + k * 2.1; localGlow(11 + Math.cos(a) * 14, -56 + Math.sin(a) * 10, 5, '220,245,255', lift); }
+};
+DRAW_TYPE.klammwaechter = (e, c, l) => {
+  ctx.save(); ctx.scale(1.28, 1.28); DRAW_TYPE.golem(e, c, l * 0.8);
+  // Moos und Faulschlamm aus dem Giftsumpf
+  ctx.fillStyle = c('#4e6a2a'); for (const [x0, y0, w0] of [[-22, -52, 10], [-14, -64, 12], [8, -64, 10], [14, -46, 8], [-18, -30, 9]]) { ctx.beginPath(); ctx.ellipse(x0, y0, w0 * 0.6, 3, 0, 0, 7); ctx.fill(); }
+  ctx.fillStyle = c('#6a8a34'); for (let k = 0; k < 5; k++) ctx.fillRect(-20 + k * 9, -54 + (k % 2) * 6, 2, 6 + Math.sin(time * 2 + k) * 1.5);
+  localGlow(0, -46, 26, '160,230,120', 0.35);
+  ctx.restore();
 };
 DRAW_TYPE.golem = (e, c, l) => {
   const pound = e.state === 'wind' ? ease(e.t / e.atk.wind) : e.state === 'act' ? 1 - e.t / e.atk.act : 0;
@@ -3578,7 +3622,7 @@ function openPortal(fire, group) {
   gs = 'menu';
   const back = fire ? openBonfire : closeMenu;
   // Gebiet eines Leuchtfeuers nach seiner Lage (nicht nach dem Index)
-  const actOf = i => { let a = WORLD_ENTRIES[0].act; for (const e of WORLD_ENTRIES) if (BONFIRES[i].x >= BONFIRES[e.i].x) a = e.act; return a; };
+  const actOf = i => { const r = regionOf(BONFIRES[i].x); const e = WORLD_ENTRIES.find(e => regionOf(BONFIRES[e.i].x) === r); return (e || WORLD_ENTRIES[0]).act; };
   const avail = [];
   BONFIRES.forEach((b, i) => { if (i === HUB || i === world.bonfire || !bfOn(i)) return; const entry = WORLD_ENTRIES.find(e => e.i === i); if (world.lit[i] || (entry && needMet(entry.need))) avail.push(i); });
   if (group) {
