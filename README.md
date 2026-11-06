@@ -22,6 +22,10 @@ Ein düsterer 2D-Souls-like im Browser – eine einzige `index.html` (HTML5 Canv
 
 Hauptmenü → *Mehrspieler (WLAN)*. Einer wählt **Spiel hosten** und bekommt einen 6-stelligen Raum-Code, der andere wählt **Beitreten** und gibt ihn ein. Läuft nur im normalen Browser (z. B. über GitHub Pages), nicht in der Claude-App. Koop: gemeinsame Welt des Hosts, Seelen für beide. Duell: am leuchtenden Stein in der Zuflucht.
 
+### Eigener Server (empfohlen im LAN)
+
+`docker compose up -d --build` startet Spiel + Mehrspieler-Server auf Port 8080. Beide öffnen `http://<Server-IP>:8080`. Details: [server/README.md](server/README.md)
+
 ## Welten
 
 - **Die Zuflucht** – Hub mit Schmied (Waffen +1…+5) und Händlerin; gereist wird über die Leuchtfeuer
@@ -59,3 +63,4 @@ Jede Version ist ein eigener Commit, die Versionsnummer steht am Anfang der Comm
 | v0.10 | Held ohne festes Schwert, alle 13 Waffen als Pixel-Art in der Hand und im Menü |
 | v0.11 | Mehrspieler im WLAN (WebRTC, Verbindung per Code): Koop durch alle Welten, Duell in der Zuflucht |
 | v0.12 | Mehrspieler mit kurzem 6-stelligem Raum-Code (nur der Gast gibt ihn ein) |
+| v0.13 | Eigener Mehrspieler-Server als Docker-Container (WebSocket, funktioniert in jedem LAN) |
