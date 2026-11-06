@@ -3686,7 +3686,7 @@ function openMain() {
     { label: 'Fortsetzen', disabled: last < 0, info: last >= 0 ? slotLine(last) : '', action: () => loadSlot(last) },
     { label: 'Neues Spiel', action: () => openSlots('new') },
     { label: 'Laden', disabled: !anySave(), action: () => openSlots('load') },
-    { label: 'Mehrspieler (WLAN)', action: () => openNetMenu(openMain, false) },
+    { label: 'Mehrspieler', action: () => openNetMenu(openMain, false) },
     { label: 'Optionen', action: () => openOptions(openMain) },
     { label: 'Steuerung', action: () => openControls(openMain) },
     { label: 'Beenden', action: quitGame },
@@ -3722,7 +3722,7 @@ function openPause() {
   openMenu({ title: 'Pause', style: 'panel', back: closeMenu, items: [
     { label: 'Fortsetzen', action: closeMenu },
     { label: 'Ausrüstung', action: () => openEquip(openPause) },
-    { label: NET.role && netOn() ? 'Mehrspieler (verbunden)' : 'Mehrspieler (WLAN)', action: () => openNetMenu(openPause, true) },
+    { label: NET.role && netOn() ? 'Mehrspieler (verbunden)' : 'Mehrspieler', action: () => openNetMenu(openPause, true) },
     { label: 'Steuerung', action: () => openControls(openPause) },
     { label: 'Optionen', action: () => openOptions(openPause) },
     { label: 'Speichern & Hauptmenü', action: () => { save(); openMain(); } },
@@ -4781,7 +4781,7 @@ function drawMenu() {
     text('ASCHENPFAD', 96, 150, 66, '#e8d8b0', 'left', undefined, 6); ctx.restore();
     text('Ein 2D-Souls-Prototyp  ·  v0.14.1', 100, 200, 16, '#8a8070', 'left', undefined, 2);
     m.items.forEach((it, i) => {
-      const y = 270 + i * 42, sel = i === m.sel;
+      const y = 258 + i * 38, sel = i === m.sel;
       const col = it.disabled ? '#45403a' : sel ? '#ffd27a' : '#cfc6b6';
       if (sel) { const g2 = ctx.createLinearGradient(80, 0, 420, 0); g2.addColorStop(0, 'rgba(255,180,90,0.16)'); g2.addColorStop(1, 'rgba(255,180,90,0)'); ctx.fillStyle = g2; ctx.fillRect(80, y - 18, 360, 36); ctx.fillStyle = '#ffd27a'; ctx.fillRect(80, y - 18, 2, 36); }
       text(it.label, 100, y, 24, col, 'left', undefined, 1);
