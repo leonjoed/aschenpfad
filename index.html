@@ -19,7 +19,7 @@ canvas{width:960px;height:540px;outline:none;display:block;cursor:crosshair}
 <script>
 'use strict';
 // =====================================================================
-//  ASCHENPFAD – 2D Souls-like  (v0.14.1)
+//  ASCHENPFAD – 2D Souls-like  (v0.14.2)
 // =====================================================================
 const VW = 960, VH = 540, T = 32, W = 1301, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -1126,6 +1126,27 @@ function drawHeldWeapon(sheet, m, pose, wid) {
   ctx.save(); ctx.beginPath(); ctx.arc(h.hx, h.hy, 3.4, 0, Math.PI * 2); ctx.clip();
   ctx.drawImage(sheet, m.x, m.y, m.w, m.h, -m.ax, -m.fy, m.w, m.h); ctx.restore();
 }
+// Mitspieler-Farbe: Umhang und Wappenrock des Gasts werden blau eingefärbt (Rüstung bleibt Stahl)
+const capeCache = {};
+function capeSheet(armor) {
+  const base = heroSheets[armor] || heroSheets.wanderer, key = armor;
+  if (capeCache[key]) return capeCache[key];
+  const c = mkCanvas(base.width, base.height), x = c.getContext('2d'); x.drawImage(base, 0, 0);
+  try {
+    const im = x.getImageData(0, 0, c.width, c.height), d = im.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      const r = d[i], g = d[i + 1], b = d[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (r === mx && r - Math.max(g, b) > 14 && (mx - mn) / (mx || 1) > 0.22) {      // rötliche, gesättigte Pixel = Stoff
+        const v = mx / 255, sat = (mx - mn) / mx;
+        d[i] = Math.round(255 * v * (1 - sat * 0.85)); d[i + 1] = Math.round(255 * v * (1 - sat * 0.45)); d[i + 2] = Math.round(255 * Math.min(1, v * 1.25));
+      }
+    }
+    x.putImageData(im, 0, 0);
+  } catch (e) {}
+  return (capeCache[key] = c);
+}
+const isBlue = remote => NET.connected && (remote ? NET.role === 'host' : NET.role === 'guest');
 function heroPose() {
   const p = P; let f = 'idle', rot = 0, ox = 0, oy = 0, sy = 1, red = false;
   switch (p.state) {
@@ -3273,7 +3294,7 @@ HOOKS.emissive.push(() => { if (!netOn() || Math.abs(DUEL_X - cam.x - VW / 2) > 
 // ---- Mitspieler zeichnen
 function drawRemote() {
   if (!netOn() || !REMOTE.alive || !heroSheets) return;
-  const R = REMOTE, sheet = heroSheets[R.armor] || heroSheets.wanderer;
+  const R = REMOTE, sheet = isBlue(true) ? capeSheet(R.armor) : heroSheets[R.armor] || heroSheets.wanderer;
   if (R.ifr && R.state !== 'roll' && Math.floor(time * 30) % 2 === 0) return;
   const cx = R.dx + R.w / 2, fy = R.dy + R.h;
   shadow(cx, fy, 16);
@@ -4503,7 +4524,7 @@ function drawPlayer() {
   shadow(cx, fy, 16);
   if (p.iframe > 0 && p.state !== 'roll' && p.state !== 'dead' && Math.floor(time * 30) % 2 === 0) return;
   if (heroSheets) {
-    const sheet = heroSheets[p.armor] || heroSheets.wanderer, pose = heroPose();
+    const sheet = isBlue(false) ? capeSheet(p.armor) : heroSheets[p.armor] || heroSheets.wanderer, pose = heroPose();
     for (const g of p.trail) drawHeroFrame(sheet, g.pose, g.x, g.y, g.face, g.a * 0.3);
     drawHeroFrame(pose.red ? heroSheets.red : p.poisonT > 0 && Math.sin(time * 6) > 0 ? heroSheets.toxic : sheet, pose, cx, fy + 1, p.face, 1);
     ctx.save(); ctx.translate(Math.round(cx), Math.round(fy)); ctx.scale(p.face, 1);
@@ -4779,7 +4800,7 @@ function drawMenu() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     ctx.save(); ctx.shadowColor = 'rgba(255,150,60,0.55)'; ctx.shadowBlur = 24;
     text('ASCHENPFAD', 96, 150, 66, '#e8d8b0', 'left', undefined, 6); ctx.restore();
-    text('Ein 2D-Souls-Prototyp  ·  v0.14.1', 100, 200, 16, '#8a8070', 'left', undefined, 2);
+    text('Ein 2D-Souls-Prototyp  ·  v0.14.2', 100, 200, 16, '#8a8070', 'left', undefined, 2);
     m.items.forEach((it, i) => {
       const y = 258 + i * 38, sel = i === m.sel;
       const col = it.disabled ? '#45403a' : sel ? '#ffd27a' : '#cfc6b6';
