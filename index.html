@@ -19,7 +19,7 @@ canvas{width:960px;height:540px;outline:none;display:block;cursor:crosshair}
 <script>
 'use strict';
 // =====================================================================
-//  ASCHENPFAD – 2D Souls-like  (v0.13.2)
+//  ASCHENPFAD – 2D Souls-like  (v0.13.3)
 // =====================================================================
 const VW = 960, VH = 540, T = 32, W = 1301, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -3274,11 +3274,11 @@ const PAGES_URL = 'https://leonjoed.github.io/aschenpfad/';
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 6 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join('');
 const peerId = c => 'aschenpfad-v1-' + c.toUpperCase();
-const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:eu-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' }, { urls: 'turn:us-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }, { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }];
+const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }];
 // Diagnose-Protokoll (Knopf „Diagnose kopieren“)
 NET.log = [];
 function nlog(...a) { const t = ((performance.now() / 1000) % 1000).toFixed(1); NET.log.push(t + ' ' + a.join(' ')); if (NET.log.length > 200) NET.log.shift(); console.log('[MP]', ...a); }
-function netDiag() { return 'Aschenpfad ' + (document.title || '') + ' | ' + navigator.userAgent + ' | ' + location.href + '\nRolle: ' + NET.role + ' | verbunden: ' + NET.connected + '\n' + NET.log.join('\n'); }
+function netDiag() { return 'Aschenpfad ' + (document.title || '') + ' | ' + navigator.userAgent + ' | ' + location.href + '\nRolle: ' + NET.role + ' | verbunden: ' + NET.connected + ' | LAN freigegeben: ' + !!NET.lanOK + '\n' + NET.log.join('\n'); }
 // zeigt den Verbindungsstatus (ICE) im Fenster an
 function watchIce(conn, title, text) {
   NET.iceState = ''; const kinds = new Set(); let hooked = false, shown = '';
@@ -3288,9 +3288,15 @@ function watchIce(conn, title, text) {
       pc.addEventListener('iceconnectionstatechange', () => nlog('ICE:', pc.iceConnectionState));
       pc.addEventListener('connectionstatechange', () => nlog('Verbindung:', pc.connectionState));
       pc.addEventListener('icecandidateerror', e => nlog('Kandidatenfehler', e.url || '', e.errorCode || '', e.errorText || '')); }
-    if (pc) { const st = pc.iceConnectionState, key = st + [...kinds].join(); if (key !== shown) { shown = key; NET.iceState = st; NET.iceKinds = kinds; if (!NET.connected) netUI({ title, text, sub: 'Verbindungsstatus: ' + ({ new: 'startet', checking: 'prüfe Verbindungswege …', connected: 'verbunden', completed: 'verbunden', failed: 'fehlgeschlagen', disconnected: 'unterbrochen', closed: 'geschlossen' }[st] || st) + '<br><span style="font-size:12px">Wege: lokal ' + (kinds.has('host') ? '✓' : '–') + ' · Internet ' + (kinds.has('srflx') ? '✓' : '–') + ' · Relay ' + (kinds.has('relay') ? '✓' : '–') + '</span>' }); } } setTimeout(tick, 400); };
+    if (pc) { const st = pc.iceConnectionState, key = st + [...kinds].join(); if (key !== shown) { shown = key; NET.iceState = st; NET.iceKinds = kinds; if (!NET.connected) netUI({ title, text, lan: true, sub: 'Verbindungsstatus: ' + ({ new: 'startet', checking: 'prüfe Verbindungswege …', connected: 'verbunden', completed: 'verbunden', failed: 'fehlgeschlagen', disconnected: 'unterbrochen', closed: 'geschlossen' }[st] || st) + '<br><span style="font-size:12px">Wege: lokal ' + (kinds.has('host') ? '✓' : '–') + ' · Internet ' + (kinds.has('srflx') ? '✓' : '–') + ' · Relay ' + (kinds.has('relay') ? '✓' : '–') + '</span>' }); } } setTimeout(tick, 400); };
   tick();
 }
+async function unlockLocalIPs() {
+  try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(t => t.stop()); NET.lanOK = true; nlog('Lokale Adressen freigegeben'); return true; }
+  catch (e) { nlog('Freigabe abgelehnt', e.name || e); return false; }
+}
+async function lanState() { try { const p = await navigator.permissions.query({ name: 'microphone' }); return p.state; } catch (e) { return '?'; } }
+const LAN_HINT = 'Klappt es nicht? <b>Beide</b> auf „Lokale Adressen freigeben“ tippen und die Mikrofon-Abfrage erlauben. Das Mikrofon wird nicht benutzt – Chrome gibt nur dann die echte Netzwerk-Adresse für die direkte Verbindung heraus.';
 function webrtcOK() { try { if (!window.RTCPeerConnection) return false; const pc = new RTCPeerConnection(); pc.close(); return true; } catch (e) { return false; } }
 function loadPeerJS() {
   if (window.Peer) return Promise.resolve();
@@ -3316,6 +3322,7 @@ function bindConn(conn) {
   conn.on('error', e => { nlog('Datenkanal-Fehler', e && (e.type || e.message || e)); lost('Verbindung verloren.'); });
 }
 async function netStart() {
+  if (!NET.lanOK && (await lanState()) === 'granted') NET.lanOK = true;
   if (!webrtcOK()) { blockedUI(); return false; }
   netUI({ title: 'Mehrspieler', text: 'Verbinde mit dem Vermittlungsserver …' });
   try { await loadPeerJS(); } catch (e) { netUI({ title: 'Mehrspieler', text: 'Der Vermittlungsdienst konnte nicht geladen werden. Prüfe die Internetverbindung.\n\nFalls du in der Claude-App spielst: Öffne das Spiel im normalen Browser unter', code: PAGES_URL, link: PAGES_URL }); NET.role = null; return false; }
@@ -3379,7 +3386,7 @@ async function netHost(tries = 0) {
   if (!tries) { const ws = await openWS(); if (ws) { serverHost(ws); return; } }
   if (!await netStart()) return;
   const code = newCode(), peer = NET.peer = new Peer(peerId(code), { debug: 0, config: { iceServers: ICE } });
-  NET.hostUI = { title: 'Mitspieler einladen', text: 'Dein Raum-Code:', big: code, sub: 'Dein Mitspieler wählt „Mehrspieler → Beitreten“ und gibt diesen Code ein.<br><b style="color:#ffd27a">Lass das Spiel dabei geöffnet und im Vordergrund</b> – nicht in eine andere App wechseln, sonst pausiert das Handy die Verbindung. Den Code am besten einfach sagen.' };
+  NET.hostUI = { title: 'Mitspieler einladen', text: 'Dein Raum-Code:', big: code, sub: 'Dein Mitspieler wählt „Mehrspieler → Beitreten“ und gibt diesen Code ein.<br><b style="color:#ffd27a">Lass das Spiel dabei geöffnet und im Vordergrund</b> – nicht in eine andere App wechseln, sonst pausiert das Handy die Verbindung. Den Code am besten einfach sagen.', lan: true };
   nlog('Host startet mit Code', code);
   peer.on('open', id => { nlog('Vermittlung verbunden als', id); netUI(NET.hostUI); });
   peer.on('disconnected', () => nlog('Vermittlung getrennt'));
@@ -3408,12 +3415,12 @@ async function netJoin() {
       bindConn(conn); watchIce(conn, 'Spiel beitreten', 'Verbinde mit ' + code + ' …' + (NET.tries ? ' (Versuch ' + (NET.tries + 1) + ')' : ''));
       NET.retry = () => { if (NET.connected || NET.role !== 'guest' || NET.tries >= 3) return; NET.tries++; try { conn.close(); } catch (e) {} setTimeout(() => { if (!NET.connected && NET.peer === peer) attempt(); }, 1500); };
       const fw = () => { if (NET.connected || NET.conn !== conn) return; const st = conn.peerConnection && conn.peerConnection.iceConnectionState; if (st === 'failed' && NET.tries < 3) { NET.retry(); return; } setTimeout(fw, 500); }; fw();
-      const tryNo = NET.tries; setTimeout(() => { if (!NET.connected && NET.role === 'guest' && NET.tries === tryNo) netUI({ title: 'Spiel beitreten', text: 'Keine Verbindung zu ' + code + ' (Status: ' + (NET.iceState || 'keine Antwort') + ').', sub: NET.iceState === 'failed' || NET.iceState === 'disconnected' ? 'Der Host wurde gefunden, aber die Verbindung ist abgebrochen. Hatte der Host das Spiel die ganze Zeit im Vordergrund (nicht zu WhatsApp o. Ä. gewechselt)? Sonst: anderes WLAN oder Handy-Hotspot probieren.' : 'Ist der Code richtig und hat der Host das Einladungsfenster offen?', input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: retry }); }, 25000);
+      const tryNo = NET.tries; setTimeout(() => { if (!NET.connected && NET.role === 'guest' && NET.tries === tryNo) netUI({ title: 'Spiel beitreten', text: 'Keine Verbindung zu ' + code + ' (Status: ' + (NET.iceState || 'keine Antwort') + ').', sub: NET.iceState === 'failed' || NET.iceState === 'disconnected' ? 'Der Host wurde gefunden, aber die Verbindung ist abgebrochen. Hatte der Host das Spiel die ganze Zeit im Vordergrund (nicht zu WhatsApp o. Ä. gewechselt)? Sonst: anderes WLAN oder Handy-Hotspot probieren.' : 'Ist der Code richtig und hat der Host das Einladungsfenster offen?', input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: retry, lan: true }); }, 25000);
     };
     peer.on('open', id => { nlog('Vermittlung verbunden als', id); attempt(); });
     peer.on('error', err => { nlog('Gast-Fehler', err.type || '', err.message || ''); if (!NET.connected) netUI({ title: 'Spiel beitreten', text: err.type === 'peer-unavailable' ? 'Kein Spiel mit dem Code ' + code + ' gefunden.' : 'Verbindung fehlgeschlagen (' + (err.type || err) + ').', input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: retry }); });
   };
-  netUI({ title: 'Spiel beitreten', text: 'Gib den Raum-Code des Hosts ein:', input: 'z. B. K7MPX2', btn: 'Verbinden', onBtn: onJoin });
+  netUI({ title: 'Spiel beitreten', text: 'Gib den Raum-Code des Hosts ein:', input: 'z. B. K7MPX2', btn: 'Verbinden', onBtn: onJoin, lan: !serverURL() });
 }
 function netClose(msg) {
   const was = NET.role;
@@ -3448,10 +3455,12 @@ function netUI(o) {
     ${o.code ? `<div style="font:15px monospace;color:#ffd8a0;background:#120f14;border:1px solid #5e5240;border-radius:6px;padding:10px;word-break:break-all;user-select:all">${o.code}</div>` + btn('netcopy', 'Adresse kopieren', true) + (o.link ? `<a href="${o.link}" target="_blank" rel="noopener" style="display:inline-block;margin:6px 0 0;padding:10px 16px;font:15px Georgia,serif;border-radius:6px;border:1px solid #8a7a58;background:#211c22;color:#ffd8a0;text-decoration:none">Öffnen</a>` : '') : ''}
     ${o.input ? '<div style="margin-top:10px"></div>' + `<input id="netin" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${o.input}" style="width:100%;background:#120f14;color:#ffd27a;border:1px solid #5e5240;border-radius:6px;padding:12px;font:bold 26px monospace;letter-spacing:6px;text-transform:uppercase;text-align:center;box-sizing:border-box">` + btn('netgo', o.btn, true) : ''}
     ${o.err ? `<div style="color:#ff8a6a;margin-top:8px">${o.err}</div>` : ''}
+    ${o.lan && !NET.lanOK ? `<div style="font-size:13px;color:#a0968a;margin-top:12px;line-height:1.5">${LAN_HINT}</div>` + btn('netlan', 'Lokale Adressen freigeben') : ''}${o.lan && NET.lanOK ? '<div style="font-size:13px;color:#9adc8a;margin-top:10px">✓ Lokale Adressen freigegeben</div>' : ''}
     <div style="text-align:right">${NET.log.length ? btn('netdiag', 'Diagnose kopieren') : ''}${btn('netx', NET.connected ? 'Schließen' : 'Abbrechen')}</div></div>`;
   const $ = id => document.getElementById(id);
   if ($('netcopy')) $('netcopy').onclick = async () => { try { await navigator.clipboard.writeText(o.big || o.code); $('netcopy').textContent = 'Kopiert ✓'; } catch (e) {} };
   if ($('netgo')) { const go = () => { const v = $('netin').value.trim(); if (v) o.onBtn(v); }; $('netgo').onclick = go; $('netin').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') go(); }; if (!o.list) setTimeout(() => $('netin') && $('netin').focus(), 50); }
+  if ($('netlan')) $('netlan').onclick = async () => { await unlockLocalIPs(); netUI(Object.assign({}, o)); if (o.onLan) o.onLan(); };
   if ($('netdiag')) $('netdiag').onclick = async () => { try { await navigator.clipboard.writeText(netDiag()); $('netdiag').textContent = 'Kopiert ✓'; } catch (e) { $('netdiag').textContent = 'Kopieren nicht möglich'; } };
   el.querySelectorAll('[data-li]').forEach(b => { b.onclick = () => o.list[+b.dataset.li].onClick(); });
   if (prevIn && $('netin')) { $('netin').value = prevIn; if (hadFocus) $('netin').focus(); }
@@ -4752,7 +4761,7 @@ function drawMenu() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     ctx.save(); ctx.shadowColor = 'rgba(255,150,60,0.55)'; ctx.shadowBlur = 24;
     text('ASCHENPFAD', 96, 150, 66, '#e8d8b0', 'left', undefined, 6); ctx.restore();
-    text('Ein 2D-Souls-Prototyp  ·  v0.13.2', 100, 200, 16, '#8a8070', 'left', undefined, 2);
+    text('Ein 2D-Souls-Prototyp  ·  v0.13.3', 100, 200, 16, '#8a8070', 'left', undefined, 2);
     ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(10, 496, 940, 40);
     text('Controller-Test: ' + (padDiag || 'noch nicht abgefragt'), 20, 512, 13, '#e8dcc0', 'left'); text('Letzte Taste: ' + lastKey + '  ·  Permissions-Policy gamepad: ' + (document.featurePolicy ? String(document.featurePolicy.allowsFeature('gamepad')) : '?'), 20, 529, 13, '#e8dcc0', 'left');
     m.items.forEach((it, i) => {
