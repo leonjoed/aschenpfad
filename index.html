@@ -1202,7 +1202,7 @@ function resetPlayer() {
   P.iframe = 0; P.atk = null; P.stDelay = 0; P.coyote = 0; P.stepT = 0; recalcStats();
   P.hp = P.hpShow = P.maxHp; P.st = P.maxSt; P.flasks = P.maxFlasks; P.onGround = true;
   P.poise = P.poiseMax; P.poiseT = 0; P.tox = 0; P.poisonT = 0; P.cold = 0; P.chillT = 0;
-  P.lastGround = { x: P.x + P.w / 2, y: P.y + P.h };
+  P.lastGround = { x: P.x + P.w / 2, y: P.y + P.h }; P.safeGround = null;
   cape.pts = []; P.trail = []; P.trailT = 0;
 }
 let buf = null, jumpBuf = 0;
@@ -1276,7 +1276,7 @@ function updatePlayer(dt, I) {
   if (p.stDelay > 0) p.stDelay -= dt;
   else { const r = { free: 40, hurt: 40, heal: 12, block: 14 }[p.state]; if (r) p.st = Math.min(p.maxSt, p.st + r * p.stMul * dt * (p.poisonT > 0 ? 0.6 : 1) * (p.chillT > 0 ? 0.5 : 1)); }
   if (p.hpShow > p.hp) p.hpShow = Math.max(p.hp, p.hpShow - 70 * dt); else p.hpShow = p.hp;
-  if (p.onGround) { p.coyote = 0.1; p.lastGround = { x: p.x + p.w / 2, y: p.y + p.h }; } else p.coyote -= dt;
+  if (p.onGround) { p.coyote = 0.1; p.lastGround = { x: p.x + p.w / 2, y: p.y + p.h }; if (p.y + p.h <= (H - 1) * T + 1) p.safeGround = { x: p.x + p.w / 2, y: p.y + p.h }; } else p.coyote -= dt;
   if (jumpBuf > 0) jumpBuf -= dt;
   switch (p.state) {
     case 'free':
@@ -1420,7 +1420,7 @@ function parrySuccess(src) {
   setState('free');
 }
 function die() {
-  if (opts.god && !NET.pvp) { P.hp = P.maxHp; P.vx = P.vy = 0; if (P.lastGround) { P.x = P.lastGround.x - P.w / 2 - P.face * 40; P.y = P.lastGround.y - P.h - 2; } setState('free'); toast('Gottmodus: gerettet', 1); return; }
+  if (opts.god && !NET.pvp) { P.hp = P.maxHp; P.vx = P.vy = 0; const sg = P.safeGround || (BONFIRES[world.bonfire] ? { x: BONFIRES[world.bonfire].x, y: BONFIRES[world.bonfire].y } : null); if (sg) { P.x = sg.x - P.w / 2; P.y = sg.y - P.h - 2; } setState('free'); toast('Gottmodus: gerettet', 1); return; }
   if (NET.pvp && netOn()) { netSend({ t: 'pvpWin' }); endDuel(false); return; }
   if (NET.role === 'guest' && netOn()) { P.hp = 0; setState('dead'); gs = 'dead'; deathT = 0; sfx('death'); blood(P.x + P.w / 2, P.y + 20, P.face, 30); NET.waitBoss = anyBoss(); if (NET.waitBoss) toast('Gefallen – du stehst wieder auf, wenn der Boss besiegt ist oder dein Mitspieler fällt.', 4); return; }
   P.hp = 0; setState('dead'); gs = 'dead'; deathT = 0; sfx('death');
