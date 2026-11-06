@@ -42,6 +42,7 @@ const maskC = mkCanvas(VW, VH), mctx = maskC.getContext('2d');
 const lC = mkCanvas(VW / 2, VH / 2), lctx = lC.getContext('2d');
 const tmpC = mkCanvas(VW, VH), tmpx = tmpC.getContext('2d');
 let ctx = sctx;   // aktueller Zeichenkontext
+let progBr = null, progBl = null, fboA = null, fboB = null, fboC = null, fboD = null;
 let progUl = null, rayP = { x: 0.7, y: 0.1, s: 0 }, punch = 0;
 let gl = null, out2d = null, progHi = null, progLo = null, glTex = null;
 const VS = 'attribute vec2 a;varying vec2 v;void main(){v=vec2(a.x*.5+.5,.5-a.y*.5);gl_Position=vec4(a,0.,1.);}';
@@ -58,24 +59,28 @@ c*=mix(vec3(.84,.92,1.08),vec3(1.08,1.,.88),smoothstep(.12,.7,l));
 c=pow(max(c,0.),vec3(1.12));c*=1.-k*1.3;
 c=mix(c,vec3(.32,0.,0.),hurt*smoothstep(.08,.45,k));
 c+=(rnd(v*r+tm)-.5)*.05;gl_FragColor=vec4(c,1.);}`;
-const FS_UL = FS_COMMON.replace('uniform float tm,hurt;', 'uniform float tm,hurt,ls,pc;uniform vec2 lp;') + `
+const FS_UL = FS_COMMON.replace('uniform float tm,hurt;', 'uniform float tm,hurt,ls,pc;uniform vec2 lp;uniform sampler2D bt,bn;') + `
 vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
-void main(){vec2 d=v-.5;float k=dot(d,d);vec2 ca=d*k*(.014+pc*.05);
+void main(){vec2 d=v-.5;float k=dot(d,d);vec2 ca=d*k*(.006+pc*.03);
 vec3 c=vec3(texture2D(t,v+ca).r,texture2D(t,v).g,texture2D(t,v-ca).b);
-vec3 bl=vec3(0.),bs=vec3(0.);
-for(int i=0;i<12;i++){float a=float(i)*.5236+.2;vec2 o=vec2(cos(a),sin(a))/r;
-vec3 s1=texture2D(t,v+o*2.).rgb;bs+=s1;
-bl+=smoothstep(.38,.9,s1)*.6+smoothstep(.36,.9,texture2D(t,v+o*7.).rgb)*.8+smoothstep(.34,.9,texture2D(t,v+o*16.).rgb)*.6+smoothstep(.32,.9,texture2D(t,v+o*32.).rgb)*.42;}
-bs/=12.;c+=(c-bs)*.18;
-c+=bl*.085;
-vec2 dl=(v-lp)/28.;vec2 q=v;float il=1.;vec3 gr=vec3(0.);
-for(int i=0;i<28;i++){q-=dl;vec3 sm=texture2D(t,q).rgb;gr+=smoothstep(.45,1.,sm)*il;il*=.93;}
-c+=gr*ls*.06;
-float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,.8);
-c*=mix(vec3(.86,.94,1.1),vec3(1.1,1.,.86),smoothstep(.1,.7,l));
-c=aces(c*1.06);c=mix(c,c*c*(3.-2.*c),.35);c=pow(c,vec3(1.1));c*=1.-k*1.25;
+vec3 bl=texture2D(bt,v).rgb,bn2=texture2D(bn,v).rgb;
+c+=bl*.7+bn2*.45;
+vec2 dl=(v-lp)/24.;vec2 q=v;float il=1.;vec3 gr=vec3(0.);
+for(int i=0;i<24;i++){q-=dl;gr+=texture2D(bt,q).rgb*il;il*=.92;}
+c+=gr*ls*.07;
+float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,.82);
+c*=mix(vec3(.88,.95,1.08),vec3(1.08,1.,.88),smoothstep(.1,.7,l));
+c=aces(c*1.06);c=mix(c,c*c*(3.-2.*c),.3);c=pow(c,vec3(1.08));c*=1.-k*1.2;
 c=mix(c,vec3(.34,0.,0.),hurt*smoothstep(.08,.45,k));
-c+=(rnd(v*r+tm)-.5)*.035;gl_FragColor=vec4(c,1.);}`;
+c+=(rnd(v*r+tm)-.5)*.03;gl_FragColor=vec4(c,1.);}`;
+// Bloom-Vorstufen: Helligkeit herausfiltern (verkleinert) und weich weichzeichnen (getrennt H/V)
+const FS_BRIGHT = `precision mediump float;uniform sampler2D t;uniform vec2 r;varying vec2 v;
+void main(){vec2 o=.5/r;vec3 c=(texture2D(t,v+vec2(-o.x,-o.y)).rgb+texture2D(t,v+vec2(o.x,-o.y)).rgb+texture2D(t,v+vec2(-o.x,o.y)).rgb+texture2D(t,v+vec2(o.x,o.y)).rgb)*.25;
+float l=max(c.r,max(c.g,c.b));gl_FragColor=vec4(c*smoothstep(.42,.95,l),1.);}`;
+const FS_BLUR = `precision mediump float;uniform sampler2D t;uniform vec2 dir;varying vec2 v;
+void main(){vec3 c=texture2D(t,v).rgb*.2270;
+c+=(texture2D(t,v+dir*1.3846).rgb+texture2D(t,v-dir*1.3846).rgb)*.3162;
+c+=(texture2D(t,v+dir*3.2308).rgb+texture2D(t,v-dir*3.2308).rgb)*.0703;gl_FragColor=vec4(c,1.);}`;
 const FS_LO = FS_COMMON + `void main(){vec2 d=v-.5;float k=dot(d,d);vec3 c=texture2D(t,v).rgb;
 float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,.78);c*=1.-k*1.2;
 c=mix(c,vec3(.32,0.,0.),hurt*smoothstep(.08,.45,k));gl_FragColor=vec4(c,1.);}`;
@@ -94,7 +99,16 @@ function initGL() {
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('link');
       return { p, t: gl.getUniformLocation(p, 't'), r: gl.getUniformLocation(p, 'r'), tm: gl.getUniformLocation(p, 'tm'), hurt: gl.getUniformLocation(p, 'hurt'), lp: gl.getUniformLocation(p, 'lp'), ls: gl.getUniformLocation(p, 'ls'), pc: gl.getUniformLocation(p, 'pc') };
     };
-    progHi = mk(FS_HI); progLo = mk(FS_LO); try { progUl = mk(FS_UL); } catch (e) { console.warn('Ultra-Shader', e); progUl = progHi; }
+    progHi = mk(FS_HI); progLo = mk(FS_LO);
+    try {
+      progUl = mk(FS_UL); progUl.bt = gl.getUniformLocation(progUl.p, 'bt'); progUl.bn = gl.getUniformLocation(progUl.p, 'bn');
+      progBr = mk(FS_BRIGHT); progBl = mk(FS_BLUR); progBl.dir = gl.getUniformLocation(progBl.p, 'dir');
+      const mkFbo = (w, h) => { const tx = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tx); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        for (const [k, val] of [[gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE], [gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR]]) gl.texParameteri(gl.TEXTURE_2D, k, val);
+        const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tx, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('fbo'); gl.bindFramebuffer(gl.FRAMEBUFFER, null); return { tx, fb, w, h }; };
+      fboA = mkFbo(240, 135); fboB = mkFbo(240, 135); fboC = mkFbo(120, 68); fboD = mkFbo(120, 68);
+    } catch (e) { console.warn('Ultra-Shader', e); progUl = null; }
     const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
@@ -110,11 +124,27 @@ function initGL() {
 let hurtVal = 0, dmgFlash = 0;
 function present() {
   if (gl) {
-    const pr = GFX_UL() ? progUl : GFX_HI() ? progHi : progLo;
-    gl.useProgram(pr.p); gl.viewport(0, 0, cv.width, cv.height);
     gl.bindTexture(gl.TEXTURE_2D, glTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sceneC);
-    gl.uniform1i(pr.t, 0); gl.uniform2f(pr.r, VW, VH); gl.uniform1f(pr.tm, (time * 60) % 997); gl.uniform1f(pr.hurt, hurtVal); if (pr.lp) { gl.uniform2f(pr.lp, rayP.x, rayP.y); gl.uniform1f(pr.ls, rayP.s); gl.uniform1f(pr.pc, punch); }
+    const ul = GFX_UL() && progUl;
+    if (ul) {
+      const pass = (prog, src, dst, setup) => { gl.bindFramebuffer(gl.FRAMEBUFFER, dst ? dst.fb : null); gl.viewport(0, 0, dst ? dst.w : cv.width, dst ? dst.h : cv.height); gl.useProgram(prog.p); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(prog.t, 0); if (setup) setup(); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); };
+      pass(progBr, glTex, fboA, () => gl.uniform2f(progBr.r, 240, 135));
+      for (let it = 0; it < 2; it++) { pass(progBl, fboA.tx, fboB, () => gl.uniform2f(progBl.dir, 1 / 240, 0)); pass(progBl, fboB.tx, fboA, () => gl.uniform2f(progBl.dir, 0, 1 / 135)); }
+      pass(progBl, fboA.tx, fboC, () => gl.uniform2f(progBl.dir, 1 / 120, 0)); pass(progBl, fboC.tx, fboD, () => gl.uniform2f(progBl.dir, 0, 1 / 68));
+      pass(progBl, fboD.tx, fboC, () => gl.uniform2f(progBl.dir, 2 / 120, 0)); pass(progBl, fboC.tx, fboD, () => gl.uniform2f(progBl.dir, 0, 2 / 68));
+      // Endbild: Szene + weiches Leuchten (nah + weit gemischt über zwei Texturen)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height); gl.useProgram(progUl.p);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fboD.tx); gl.uniform1i(progUl.bt, 1); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, fboA.tx); gl.uniform1i(progUl.bn, 2);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, glTex); gl.uniform1i(progUl.t, 0);
+      gl.uniform2f(progUl.r, VW, VH); gl.uniform1f(progUl.tm, (time * 60) % 997); gl.uniform1f(progUl.hurt, hurtVal);
+      gl.uniform2f(progUl.lp, rayP.x, rayP.y); gl.uniform1f(progUl.ls, rayP.s); gl.uniform1f(progUl.pc, punch);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      return;
+    }
+    const pr = GFX_HI() ? progHi : progLo;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cv.width, cv.height); gl.useProgram(pr.p); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, glTex);
+    gl.uniform1i(pr.t, 0); gl.uniform2f(pr.r, VW, VH); gl.uniform1f(pr.tm, (time * 60) % 997); gl.uniform1f(pr.hurt, hurtVal);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   } else out2d.drawImage(sceneC, 0, 0);
 }
