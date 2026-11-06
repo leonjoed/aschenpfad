@@ -19,7 +19,7 @@ canvas{width:960px;height:540px;outline:none;display:block;cursor:crosshair}
 <script>
 'use strict';
 // =====================================================================
-//  ASCHENPFAD – 2D Souls-like  (v0.12)
+//  ASCHENPFAD – 2D Souls-like  (v0.12.1)
 // =====================================================================
 const VW = 960, VH = 540, T = 32, W = 1301, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -3273,6 +3273,13 @@ const PAGES_URL = 'https://leonjoed.github.io/aschenpfad/';
 const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 6 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join('');
 const peerId = c => 'aschenpfad-v1-' + c.toUpperCase();
+const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'turn:eu-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' }, { urls: 'turn:us-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }, { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }];
+// zeigt den Verbindungsstatus (ICE) im Fenster an
+function watchIce(conn, title, text) {
+  NET.iceState = '';
+  const tick = () => { if (NET.connected || NET.conn !== conn) return; const pc = conn.peerConnection; if (pc) { const st = pc.iceConnectionState; if (st !== NET.iceState) { NET.iceState = st; if (!NET.connected) netUI({ title, text, sub: 'Verbindungsstatus: ' + ({ new: 'startet', checking: 'prüfe Verbindungswege …', connected: 'verbunden', completed: 'verbunden', failed: 'fehlgeschlagen', disconnected: 'unterbrochen', closed: 'geschlossen' }[st] || st) }); } } setTimeout(tick, 400); };
+  tick();
+}
 function webrtcOK() { try { if (!window.RTCPeerConnection) return false; const pc = new RTCPeerConnection(); pc.close(); return true; } catch (e) { return false; } }
 function loadPeerJS() {
   if (window.Peer) return Promise.resolve();
@@ -3300,9 +3307,9 @@ async function netStart() {
 async function netHost(tries = 0) {
   netClose(); NET.role = 'host';
   if (!await netStart()) return;
-  const code = newCode(), peer = NET.peer = new Peer(peerId(code), { debug: 0 });
+  const code = newCode(), peer = NET.peer = new Peer(peerId(code), { debug: 0, config: { iceServers: ICE } });
   peer.on('open', () => netUI({ title: 'Mitspieler einladen', text: 'Dein Raum-Code:', big: code, sub: 'Dein Mitspieler wählt „Mehrspieler → Beitreten“ und gibt diesen Code ein. Beide im selben WLAN – oder auch über das Internet.' }));
-  peer.on('connection', conn => { if (NET.conn && NET.conn.open) { conn.close(); return; } bindConn(conn); conn.on('open', () => { try { peer.disconnect(); } catch (e) {} }); });
+  peer.on('connection', conn => { if (NET.conn && NET.conn.open) { conn.close(); return; } bindConn(conn); watchIce(conn, 'Mitspieler einladen', 'Mitspieler gefunden – verbinde …'); conn.on('open', () => { try { peer.disconnect(); } catch (e) {} }); });
   peer.on('error', err => {
     if (err.type === 'unavailable-id' && tries < 3) { netHost(tries + 1); return; }
     if (!NET.connected) netUI({ title: 'Mitspieler einladen', text: 'Der Vermittlungsserver ist nicht erreichbar (' + (err.type || err) + ').', sub: 'Prüfe die Internetverbindung oder versuche es gleich noch einmal.' });
@@ -3316,8 +3323,14 @@ async function netJoin() {
     NET.role = 'guest';
     if (!await netStart()) return;
     netUI({ title: 'Spiel beitreten', text: 'Verbinde mit ' + code + ' …' });
-    const peer = NET.peer = new Peer(undefined, { debug: 0 });
-    peer.on('open', () => { const conn = peer.connect(peerId(code), { reliable: true, serialization: 'raw' }); bindConn(conn); setTimeout(() => { if (!NET.connected && NET.role === 'guest') netUI({ title: 'Spiel beitreten', text: 'Keine Antwort von ' + code + '.', sub: 'Ist der Code richtig und hat der Host das Einladungsfenster offen?', input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: NET.ui.onBtn }); }, 12000); });
+    const peer = NET.peer = new Peer(undefined, { debug: 0, config: { iceServers: ICE } });
+    const retry = NET.ui && NET.ui.onBtn;
+    peer.on('open', () => {
+      let conn;
+      try { conn = peer.connect(peerId(code), { reliable: true }); } catch (e) { netUI({ title: 'Spiel beitreten', text: 'Fehler beim Verbinden: ' + e.message, input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: retry }); return; }
+      bindConn(conn); watchIce(conn, 'Spiel beitreten', 'Verbinde mit ' + code + ' …');
+      setTimeout(() => { if (!NET.connected && NET.role === 'guest') netUI({ title: 'Spiel beitreten', text: 'Keine Verbindung zu ' + code + ' (Status: ' + (NET.iceState || 'keine Antwort') + ').', sub: NET.iceState === 'failed' ? 'Der Host wurde gefunden, aber eure Geräte erreichen sich nicht direkt. Sind beide im selben WLAN? Manche Router (Gäste-WLAN) blockieren Verbindungen zwischen Geräten – dann hilft ein Handy-Hotspot.' : 'Ist der Code richtig und hat der Host das Einladungsfenster offen?', input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: retry }); }, 25000);
+    });
     peer.on('error', err => { if (!NET.connected) netUI({ title: 'Spiel beitreten', text: err.type === 'peer-unavailable' ? 'Kein Spiel mit dem Code ' + code + ' gefunden.' : 'Verbindung fehlgeschlagen (' + (err.type || err) + ').', input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: NET.ui && NET.ui.onBtn }); });
   } });
 }
@@ -4651,7 +4664,7 @@ function drawMenu() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     ctx.save(); ctx.shadowColor = 'rgba(255,150,60,0.55)'; ctx.shadowBlur = 24;
     text('ASCHENPFAD', 96, 150, 66, '#e8d8b0', 'left', undefined, 6); ctx.restore();
-    text('Ein 2D-Souls-Prototyp  ·  v0.12', 100, 200, 16, '#8a8070', 'left', undefined, 2);
+    text('Ein 2D-Souls-Prototyp  ·  v0.12.1', 100, 200, 16, '#8a8070', 'left', undefined, 2);
     ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(10, 496, 940, 40);
     text('Controller-Test: ' + (padDiag || 'noch nicht abgefragt'), 20, 512, 13, '#e8dcc0', 'left'); text('Letzte Taste: ' + lastKey + '  ·  Permissions-Policy gamepad: ' + (document.featurePolicy ? String(document.featurePolicy.allowsFeature('gamepad')) : '?'), 20, 529, 13, '#e8dcc0', 'left');
     m.items.forEach((it, i) => {
