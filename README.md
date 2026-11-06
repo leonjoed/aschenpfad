@@ -18,6 +18,10 @@ Ein düsterer 2D-Souls-like im Browser – eine einzige `index.html` (HTML5 Canv
 | Waffe wechseln | X | Select / − |
 | Menü | Esc | Start / + |
 
+## Mehrspieler (WLAN)
+
+Hauptmenü → *Mehrspieler (WLAN)*. Einer wählt **Spiel hosten**, der andere **Beitreten**; die beiden Codes werden einmal ausgetauscht (Kopieren/Teilen). Koop: gemeinsame Welt des Hosts, Seelen für beide. Duell: am leuchtenden Stein in der Zuflucht.
+
 ## Welten
 
 - **Die Zuflucht** – Hub mit Schmied (Waffen +1…+5) und Händlerin; gereist wird über die Leuchtfeuer
@@ -53,3 +57,4 @@ Jede Version ist ein eigener Commit, die Versionsnummer steht am Anfang der Comm
 | v0.9.6 | Feuer verletzt Gegner und fällt zu Boden, Leuchtfeuer nach Endbossen, Weltentor entfernt, Waffenstufen im Menü, Reisen nach Gebieten gruppiert |
 | v0.9.8 | Waffenbilder im Ausrüstungsmenü |
 | v0.10 | Held ohne festes Schwert, alle 13 Waffen als Pixel-Art in der Hand und im Menü |
+| v0.11 | Mehrspieler im WLAN (WebRTC, Verbindung per Code): Koop durch alle Welten, Duell in der Zuflucht |
