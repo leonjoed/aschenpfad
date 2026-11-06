@@ -38,7 +38,7 @@ Geplant: Himmelsturm (vertikal), Der Abgrund / Die Andere Seite (Finale / NG+).
 
 ## Versionen
 
-Jede Version ist als Git-Tag markiert (`v0.5` … `v0.9.8`). Frühere Stände (v0.1–v0.4) wurden nicht als Datei gesichert und fehlen daher in der Historie.
+Jede Version ist ein eigener Commit, die Versionsnummer steht am Anfang der Commit-Nachricht. Frühere Stände (v0.1–v0.4) wurden nicht als Datei gesichert und fehlen daher in der Historie.
 
 | Version | Inhalt |
 |---|---|
