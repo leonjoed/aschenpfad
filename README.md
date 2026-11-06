@@ -67,3 +67,6 @@ Jede Version ist ein eigener Commit, die Versionsnummer steht am Anfang der Comm
 | v0.13.1 | Spielbrowser: offene Spiele auf dem eigenen Server auflisten und per Klick beitreten |
 | v0.13.3 | Mehrspieler: lokale Adressen freigeben (behebt Verbindungsabbrüche im LAN), Diagnose-Protokoll |
 | v0.14 | Koop: Gast erwacht am Leuchtfeuer, im Bosskampf erst nach Sieg oder Tod des Hosts; Gegner ×1,5 / Bosse ×1,8 HP im Koop |
+
+## Fremde Grafiken
+- Skelett & Pilz-Gegner: „Monsters Creatures Fantasy“ von **Luiz Melo** – CC0 (https://luizmelo.itch.io/monsters-creatures-fantasy)
