@@ -65,3 +65,5 @@ Jede Version ist ein eigener Commit, die Versionsnummer steht am Anfang der Comm
 | v0.12 | Mehrspieler mit kurzem 6-stelligem Raum-Code (nur der Gast gibt ihn ein) |
 | v0.13 | Eigener Mehrspieler-Server als Docker-Container (WebSocket, funktioniert in jedem LAN) |
 | v0.13.1 | Spielbrowser: offene Spiele auf dem eigenen Server auflisten und per Klick beitreten |
+| v0.13.3 | Mehrspieler: lokale Adressen freigeben (behebt Verbindungsabbrüche im LAN), Diagnose-Protokoll |
+| v0.14 | Koop: Gast erwacht am Leuchtfeuer, im Bosskampf erst nach Sieg oder Tod des Hosts; Gegner ×1,5 / Bosse ×1,8 HP im Koop |
