@@ -19,7 +19,7 @@ canvas{width:960px;height:540px;outline:none;display:block;cursor:crosshair}
 <script>
 'use strict';
 // =====================================================================
-//  ASCHENPFAD – 2D Souls-like  (v0.11)
+//  ASCHENPFAD – 2D Souls-like  (v0.12)
 // =====================================================================
 const VW = 960, VH = 540, T = 32, W = 1301, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -3268,59 +3268,66 @@ function drawRemote() {
   text(NET.pvp ? 'Gegner' : 'Mitspieler', cx, R.dy - 22, 11, NET.pvp ? '#ff9a7a' : '#c8d8ff');
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(cx - 17, R.dy - 14, 34, 4); ctx.fillStyle = NET.pvp ? '#c84a2a' : '#6a8acc'; ctx.fillRect(cx - 16, R.dy - 13, 32 * clamp(R.hp / (R.maxHp || 100), 0, 1), 2);
 }
-// ---- Verbindung (WebRTC, Codes per Kopieren/Teilen)
-async function packCode(desc) {
-  const raw = new TextEncoder().encode(JSON.stringify({ t: desc.type, s: desc.sdp }));
-  let bytes = raw, pre = 'A';
-  if (window.CompressionStream) { const cs = new CompressionStream('deflate-raw'); const wr = cs.writable.getWriter(); wr.write(raw); wr.close(); bytes = new Uint8Array(await new Response(cs.readable).arrayBuffer()); pre = 'Z'; }
-  let s = ''; for (const b of bytes) s += String.fromCharCode(b);
-  return pre + btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// ---- Verbindung: kurzer Raum-Code über den freien PeerJS-Vermittlungsserver, danach direkt (WebRTC)
+const PAGES_URL = 'https://leonjoed.github.io/aschenpfad/';
+const CODE_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode = () => Array.from({ length: 6 }, () => CODE_ABC[Math.floor(Math.random() * CODE_ABC.length)]).join('');
+const peerId = c => 'aschenpfad-v1-' + c.toUpperCase();
+function webrtcOK() { try { if (!window.RTCPeerConnection) return false; const pc = new RTCPeerConnection(); pc.close(); return true; } catch (e) { return false; } }
+function loadPeerJS() {
+  if (window.Peer) return Promise.resolve();
+  const srcs = ['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
+  return new Promise((res, rej) => { const tryN = i => { if (i >= srcs.length) return rej(new Error('peerjs')); const s = document.createElement('script'); s.src = srcs[i]; s.onload = () => window.Peer ? res() : tryN(i + 1); s.onerror = () => tryN(i + 1); document.head.appendChild(s); }; tryN(0); });
 }
-async function unpackCode(code) {
-  code = code.trim().replace(/\s+/g, ''); const pre = code[0], b = atob(code.slice(1).replace(/-/g, '+').replace(/_/g, '/'));
-  let bytes = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) bytes[i] = b.charCodeAt(i);
-  if (pre === 'Z') { const ds = new DecompressionStream('deflate-raw'); const wr = ds.writable.getWriter(); wr.write(bytes); wr.close(); bytes = new Uint8Array(await new Response(ds.readable).arrayBuffer()); }
-  const o = JSON.parse(new TextDecoder().decode(bytes)); return { type: o.t, sdp: o.s };
+function blockedUI() {
+  netUI({ title: 'Mehrspieler hier nicht möglich', text: 'In der Claude-App bzw. auf der Artifact-Seite sind Netzwerkverbindungen zwischen Geräten gesperrt.\n\nÖffne das Spiel für den Mehrspieler im normalen Browser (Chrome) unter:', code: PAGES_URL, link: PAGES_URL });
+  NET.role = null;
 }
-function newPC() {
-  const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-  pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') netClose('Verbindung verloren.'); };
-  return pc;
+function bindConn(conn) {
+  NET.conn = conn;
+  NET.dc = { send: s => conn.send(s), get readyState() { return conn.open ? 'open' : 'closed'; }, close: () => conn.close() };
+  conn.on('open', () => { NET.connected = true; netUI(null); toast(NET.role === 'host' ? 'Mitspieler verbunden!' : 'Verbunden – du bist in der Welt des Hosts', 3); if (NET.role === 'guest') netSend({ t: 'hello' }); });
+  conn.on('data', d => { try { netMessage(typeof d === 'string' ? JSON.parse(d) : d); } catch (e) { console.warn(e); } });
+  conn.on('close', () => netClose('Verbindung getrennt.'));
+  conn.on('error', () => netClose('Verbindung verloren.'));
 }
-const iceDone = pc => new Promise(res => { if (pc.iceGatheringState === 'complete') return res(); const t = setTimeout(res, 3500); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } }); });
-function bindDC(dc) {
-  NET.dc = dc;
-  dc.onopen = () => { NET.connected = true; netUI(null); toast(NET.role === 'host' ? 'Mitspieler verbunden!' : 'Verbunden – du bist in der Welt des Hosts', 3); if (NET.role === 'guest') netSend({ t: 'hello' }); };
-  dc.onmessage = ev => { try { netMessage(JSON.parse(ev.data)); } catch (e) { console.warn(e); } };
-  dc.onclose = () => netClose('Verbindung getrennt.');
+async function netStart() {
+  if (!webrtcOK()) { blockedUI(); return false; }
+  netUI({ title: 'Mehrspieler', text: 'Verbinde mit dem Vermittlungsserver …' });
+  try { await loadPeerJS(); } catch (e) { netUI({ title: 'Mehrspieler', text: 'Der Vermittlungsdienst konnte nicht geladen werden. Prüfe die Internetverbindung.\n\nFalls du in der Claude-App spielst: Öffne das Spiel im normalen Browser unter', code: PAGES_URL, link: PAGES_URL }); NET.role = null; return false; }
+  return true;
 }
-async function netHost() {
-  netClose(); NET.role = 'host'; const pc = NET.pc = newPC(); bindDC(pc.createDataChannel('aschenpfad'));
-  netUI({ title: 'Mitspieler einladen', text: 'Erzeuge Einladung …' });
-  await pc.setLocalDescription(await pc.createOffer()); await iceDone(pc);
-  const code = await packCode(pc.localDescription);
-  netUI({ title: 'Mitspieler einladen', text: '1. Schicke deinem Mitspieler diesen Einladungscode (Kopieren oder Teilen).\n2. Er wählt „Mehrspieler → Beitreten“ und fügt ihn ein.\n3. Füge hier seinen Antwortcode ein.', code, input: 'Antwortcode hier einfügen', btn: 'Verbinden', onBtn: async v => {
-    try { await pc.setRemoteDescription(await unpackCode(v)); netUI({ title: 'Verbinde …', text: 'Einen Moment …' }); } catch (e) { netUI(Object.assign({}, NET.ui, { err: 'Der Code ist ungültig.' })); }
-  } });
+async function netHost(tries = 0) {
+  netClose(); NET.role = 'host';
+  if (!await netStart()) return;
+  const code = newCode(), peer = NET.peer = new Peer(peerId(code), { debug: 0 });
+  peer.on('open', () => netUI({ title: 'Mitspieler einladen', text: 'Dein Raum-Code:', big: code, sub: 'Dein Mitspieler wählt „Mehrspieler → Beitreten“ und gibt diesen Code ein. Beide im selben WLAN – oder auch über das Internet.' }));
+  peer.on('connection', conn => { if (NET.conn && NET.conn.open) { conn.close(); return; } bindConn(conn); conn.on('open', () => { try { peer.disconnect(); } catch (e) {} }); });
+  peer.on('error', err => {
+    if (err.type === 'unavailable-id' && tries < 3) { netHost(tries + 1); return; }
+    if (!NET.connected) netUI({ title: 'Mitspieler einladen', text: 'Der Vermittlungsserver ist nicht erreichbar (' + (err.type || err) + ').', sub: 'Prüfe die Internetverbindung oder versuche es gleich noch einmal.' });
+  });
 }
 async function netJoin() {
   netClose(); NET.role = 'guest';
-  netUI({ title: 'Spiel beitreten', text: 'Füge den Einladungscode des Hosts ein.', input: 'Einladungscode hier einfügen', btn: 'Weiter', onBtn: async v => {
-    try {
-      const pc = NET.pc = newPC(); pc.ondatachannel = ev => bindDC(ev.channel);
-      await pc.setRemoteDescription(await unpackCode(v)); await pc.setLocalDescription(await pc.createAnswer());
-      netUI({ title: 'Spiel beitreten', text: 'Erzeuge Antwort …' }); await iceDone(pc);
-      const code = await packCode(pc.localDescription);
-      netUI({ title: 'Spiel beitreten', text: 'Schicke diesen Antwortcode an den Host zurück. Sobald er ihn eingefügt hat, seid ihr verbunden.', code });
-    } catch (e) { netUI(Object.assign({}, NET.ui, { err: 'Der Code ist ungültig.' })); }
+  netUI({ title: 'Spiel beitreten', text: 'Gib den Raum-Code des Hosts ein:', input: 'z. B. K7MPX2', btn: 'Verbinden', onBtn: async v => {
+    const code = v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+    if (!code) return;
+    NET.role = 'guest';
+    if (!await netStart()) return;
+    netUI({ title: 'Spiel beitreten', text: 'Verbinde mit ' + code + ' …' });
+    const peer = NET.peer = new Peer(undefined, { debug: 0 });
+    peer.on('open', () => { const conn = peer.connect(peerId(code), { reliable: true, serialization: 'raw' }); bindConn(conn); setTimeout(() => { if (!NET.connected && NET.role === 'guest') netUI({ title: 'Spiel beitreten', text: 'Keine Antwort von ' + code + '.', sub: 'Ist der Code richtig und hat der Host das Einladungsfenster offen?', input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: NET.ui.onBtn }); }, 12000); });
+    peer.on('error', err => { if (!NET.connected) netUI({ title: 'Spiel beitreten', text: err.type === 'peer-unavailable' ? 'Kein Spiel mit dem Code ' + code + ' gefunden.' : 'Verbindung fehlgeschlagen (' + (err.type || err) + ').', input: 'Raum-Code', btn: 'Erneut verbinden', onBtn: NET.ui && NET.ui.onBtn }); });
   } });
 }
 function netClose(msg) {
   const was = NET.role;
-  if (NET.dc) { try { if (NET.dc.readyState === 'open') NET.dc.send(JSON.stringify({ t: 'bye' })); } catch (e) {} try { NET.dc.close(); } catch (e) {} }
-  if (NET.pc) try { NET.pc.close(); } catch (e) {}
-  NET.pc = NET.dc = null; NET.connected = false; NET.pvp = false; NET.duelAsk = false; REMOTE.alive = false;
-  if (was === 'guest' && NET.guestBase !== null && gs !== 'main') { NET.role = null; if (msg) toast(msg + ' Zurück in deiner eigenen Welt.', 3.5); const s = NET.guestBase; NET.guestBase = null; applySave(s); startWorld(); return; }
+  try { if (NET.dc && NET.dc.readyState === 'open') NET.dc.send(JSON.stringify({ t: 'bye' })); } catch (e) {}
+  try { if (NET.conn) NET.conn.close(); } catch (e) {}
+  try { if (NET.peer) NET.peer.destroy(); } catch (e) {}
+  NET.peer = NET.conn = NET.dc = null; NET.connected = false; NET.pvp = false; NET.duelAsk = false; REMOTE.alive = false;
+  if (was === 'guest' && NET.guestBase !== null && gs !== 'main') { NET.role = null; if (msg) toast(msg + ' Zurück in deiner eigenen Welt.', 3.5); const s = NET.guestBase; NET.guestBase = null; if (s) { applySave(s); startWorld(); } return; }
   NET.role = null; if (msg && was) toast(msg, 3);
 }
 // ---- HTML-Fenster für die Codes
@@ -3338,20 +3345,20 @@ function netUI(o) {
   el.innerHTML = `<div style="width:min(560px,92vw);background:#16121a;border:1px solid #5e5240;border-radius:10px;padding:18px 20px;box-shadow:0 0 40px #000">
     <div style="font-size:22px;color:#ffd27a;margin-bottom:8px">${o.title}</div>
     <div style="white-space:pre-line;font-size:14px;line-height:1.5;color:#cfc6b6;margin-bottom:10px">${o.text || ''}</div>
-    ${o.code ? box(o.code, true) + btn('netcopy', 'Kopieren', true) + (navigator.share ? btn('netshare', 'Teilen') : '') : ''}
-    ${o.input ? '<div style="margin-top:10px"></div>' + `<textarea id="netin" placeholder="${o.input}" style="width:100%;height:70px;background:#120f14;color:#e8dcc0;border:1px solid #5e5240;border-radius:6px;padding:8px;font:12px monospace;box-sizing:border-box"></textarea>` + btn('netgo', o.btn, true) + btn('netpaste', 'Einfügen') : ''}
+    ${o.big ? `<div style="font:bold 46px monospace;letter-spacing:10px;color:#ffd27a;text-align:center;margin:6px 0 10px;user-select:all">${o.big}</div>` + btn('netcopy', 'Code kopieren', true) : ''}
+    ${o.sub ? `<div style="font-size:13px;color:#a0968a;margin-top:10px;line-height:1.5">${o.sub}</div>` : ''}
+    ${o.code ? `<div style="font:15px monospace;color:#ffd8a0;background:#120f14;border:1px solid #5e5240;border-radius:6px;padding:10px;word-break:break-all;user-select:all">${o.code}</div>` + btn('netcopy', 'Adresse kopieren', true) + (o.link ? `<a href="${o.link}" target="_blank" rel="noopener" style="display:inline-block;margin:6px 0 0;padding:10px 16px;font:15px Georgia,serif;border-radius:6px;border:1px solid #8a7a58;background:#211c22;color:#ffd8a0;text-decoration:none">Öffnen</a>` : '') : ''}
+    ${o.input ? '<div style="margin-top:10px"></div>' + `<input id="netin" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${o.input}" style="width:100%;background:#120f14;color:#ffd27a;border:1px solid #5e5240;border-radius:6px;padding:12px;font:bold 26px monospace;letter-spacing:6px;text-transform:uppercase;text-align:center;box-sizing:border-box">` + btn('netgo', o.btn, true) : ''}
     ${o.err ? `<div style="color:#ff8a6a;margin-top:8px">${o.err}</div>` : ''}
     <div style="text-align:right">${btn('netx', NET.connected ? 'Schließen' : 'Abbrechen')}</div></div>`;
   const $ = id => document.getElementById(id);
-  if ($('netcopy')) $('netcopy').onclick = async () => { try { await navigator.clipboard.writeText(o.code); $('netcopy').textContent = 'Kopiert ✓'; } catch (e) { const t = el.querySelector('textarea'); t.select(); document.execCommand('copy'); $('netcopy').textContent = 'Kopiert ✓'; } };
-  if ($('netshare')) $('netshare').onclick = () => navigator.share({ text: o.code }).catch(() => {});
-  if ($('netpaste')) $('netpaste').onclick = async () => { try { $('netin').value = await navigator.clipboard.readText(); } catch (e) {} };
-  if ($('netgo')) $('netgo').onclick = () => { const v = $('netin').value.trim(); if (v) o.onBtn(v); };
+  if ($('netcopy')) $('netcopy').onclick = async () => { try { await navigator.clipboard.writeText(o.big || o.code); $('netcopy').textContent = 'Kopiert ✓'; } catch (e) {} };
+  if ($('netgo')) { const go = () => { const v = $('netin').value.trim(); if (v) o.onBtn(v); }; $('netgo').onclick = go; $('netin').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') go(); }; setTimeout(() => $('netin') && $('netin').focus(), 50); }
   $('netx').onclick = () => { netUI(null); if (!NET.connected) netClose(); };
   el.onkeydown = e => e.stopPropagation(); el.onkeyup = e => e.stopPropagation();
 }
 function openNetMenu(back, inGame) {
-  openMenu({ title: 'Mehrspieler (WLAN)', sub: 'Beide Geräte im selben WLAN · Verbindung per Code', style: 'panel', back, items: [
+  openMenu({ title: 'Mehrspieler', sub: 'Host nennt einen kurzen Raum-Code, der Mitspieler gibt ihn ein', style: 'panel', back, items: [
     { label: 'Spiel hosten', info: 'deine Welt, dein Spielstand', action: () => { if (inGame) { closeMenu(); } else { const l = lastSlot(); if (l >= 0) loadSlot(l); else startNew(0); } netHost(); } },
     { label: 'Beitreten', info: 'mit deinem Charakter', action: () => { if (inGame) { save(); closeMenu(); } else { const l = lastSlot(); if (l >= 0) loadSlot(l); else startNew(0); } NET.guestBase = JSON.parse(localStorage.getItem(SLOT_KEY(slot)) || 'null'); netJoin(); } },
     ...(NET.role ? [{ label: 'Verbindung trennen', action: () => { netClose('Getrennt.'); closeMenu(); } }] : []),
@@ -4644,7 +4651,7 @@ function drawMenu() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     ctx.save(); ctx.shadowColor = 'rgba(255,150,60,0.55)'; ctx.shadowBlur = 24;
     text('ASCHENPFAD', 96, 150, 66, '#e8d8b0', 'left', undefined, 6); ctx.restore();
-    text('Ein 2D-Souls-Prototyp  ·  v0.11', 100, 200, 16, '#8a8070', 'left', undefined, 2);
+    text('Ein 2D-Souls-Prototyp  ·  v0.12', 100, 200, 16, '#8a8070', 'left', undefined, 2);
     ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(10, 496, 940, 40);
     text('Controller-Test: ' + (padDiag || 'noch nicht abgefragt'), 20, 512, 13, '#e8dcc0', 'left'); text('Letzte Taste: ' + lastKey + '  ·  Permissions-Policy gamepad: ' + (document.featurePolicy ? String(document.featurePolicy.allowsFeature('gamepad')) : '?'), 20, 529, 13, '#e8dcc0', 'left');
     m.items.forEach((it, i) => {

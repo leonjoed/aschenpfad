@@ -20,7 +20,7 @@ Ein düsterer 2D-Souls-like im Browser – eine einzige `index.html` (HTML5 Canv
 
 ## Mehrspieler (WLAN)
 
-Hauptmenü → *Mehrspieler (WLAN)*. Einer wählt **Spiel hosten**, der andere **Beitreten**; die beiden Codes werden einmal ausgetauscht (Kopieren/Teilen). Koop: gemeinsame Welt des Hosts, Seelen für beide. Duell: am leuchtenden Stein in der Zuflucht.
+Hauptmenü → *Mehrspieler (WLAN)*. Einer wählt **Spiel hosten** und bekommt einen 6-stelligen Raum-Code, der andere wählt **Beitreten** und gibt ihn ein. Läuft nur im normalen Browser (z. B. über GitHub Pages), nicht in der Claude-App. Koop: gemeinsame Welt des Hosts, Seelen für beide. Duell: am leuchtenden Stein in der Zuflucht.
 
 ## Welten
 
@@ -58,3 +58,4 @@ Jede Version ist ein eigener Commit, die Versionsnummer steht am Anfang der Comm
 | v0.9.8 | Waffenbilder im Ausrüstungsmenü |
 | v0.10 | Held ohne festes Schwert, alle 13 Waffen als Pixel-Art in der Hand und im Menü |
 | v0.11 | Mehrspieler im WLAN (WebRTC, Verbindung per Code): Koop durch alle Welten, Duell in der Zuflucht |
+| v0.12 | Mehrspieler mit kurzem 6-stelligem Raum-Code (nur der Gast gibt ihn ein) |
