@@ -3328,7 +3328,7 @@ function openBonfire() {
 }
 function openEquip(back) {
   const items = [];
-  world.weapons.forEach(id => { const w = WEAPONS[id], wl = () => (world.wlevel || {})[id] || 0; items.push({ label: w.name + (wl() ? ' +' + wl() : ''), group: 'Waffen', info: () => (P.weapon === id ? '● angelegt  ·  ' : '') + 'Stufe +' + wl() + ' / 5',
+  world.weapons.forEach(id => { const w = WEAPONS[id], wl = () => (world.wlevel || {})[id] || 0; items.push({ icon: id, label: w.name + (wl() ? ' +' + wl() : ''), group: 'Waffen', info: () => (P.weapon === id ? '● angelegt  ·  ' : '') + 'Stufe +' + wl() + ' / 5',
     desc: () => { const m = 1 + 0.08 * wl(); return [w.desc, `Stufe +${wl()} (Schaden ×${m.toFixed(2)})`, `Leicht: ${Math.round(w.light.dmg * m)} Schaden · ${w.light.cost} Ausdauer`, `Schwer: ${Math.round(w.heavy.dmg * m)} Schaden · ${w.heavy.cost} Ausdauer`]; },
     action: () => { P.weapon = id; sfx('swap'); save(); } }); });
   world.armors.forEach(id => { const a = ARMORS[id]; items.push({ label: a.name, group: 'Rüstungen', info: () => P.armor === id ? '● angelegt' : '',
@@ -4362,7 +4362,7 @@ function drawMenu() {
   m.items.forEach((it, i) => { if (it.group && it.group !== lg) { rows.push({ h: 26, group: it.group }); lg = it.group; } rows.push({ h: rowH, i }); });
   const contentH = rows.reduce((a, r) => a + r.h, 0);
   const headH = 70 + (m.sub ? 22 : 0), footH = 40;
-  const listH = Math.min(contentH, VH - 24 - headH - footH);
+  const listH = Math.min(hasDesc && m.items.some(it => it.icon) ? Math.max(contentH, 360) : contentH, VH - 24 - headH - footH);
   const ph = headH + listH + footH, x = (VW - pw) / 2, y = (VH - ph) / 2, listTop = y + headH;
   // Scrollen: ausgewählten Eintrag sichtbar halten
   let off = 0, selTop = 0; for (const r of rows) { if (r.i === m.sel) { selTop = off; break; } off += r.h; }
@@ -4383,7 +4383,8 @@ function drawMenu() {
       else {
         const it = m.items[r.i], ry = yy + rowH / 2, sel = r.i === m.sel;
         if (sel) { const g2 = ctx.createLinearGradient(x + 20, 0, x + listW - 20, 0); g2.addColorStop(0, 'rgba(255,180,90,0.18)'); g2.addColorStop(1, 'rgba(255,180,90,0.02)'); ctx.fillStyle = g2; ctx.fillRect(x + 20, ry - 16, listW - 40, 32); ctx.fillStyle = '#ffd27a'; ctx.fillRect(x + 20, ry - 16, 2, 32); }
-        text(it.label, x + 40, ry, 18, it.disabled ? '#45403a' : sel ? '#ffd27a' : '#cfc6b6', 'left');
+        if (it.icon) drawWeaponIcon(it.icon, x + 52, ry, 28);
+        text(it.label, x + (it.icon ? 76 : 40), ry, 18, it.disabled ? '#45403a' : sel ? '#ffd27a' : '#cfc6b6', 'left');
         if (it.info) text(val(it.info), x + listW - 34, ry, 13, it.disabled ? '#45403a' : '#8a8274', 'right');
         if (ry - 16 >= listTop - 4 && ry + 16 <= listTop + listH + 4) menuRects.push({ x: x + 20, y: ry - 16, w: listW - 40, h: 32, i: r.i });
       }
@@ -4402,9 +4403,53 @@ function drawMenu() {
       ctx.fillStyle = 'rgba(138,122,88,0.4)'; ctx.fillRect(dx + 18, listTop + 44, dw - 36, 1);
       let ly = listTop + 68;
       lines.forEach((ln, k) => { for (const w of wrapText(ln, dw - 36, 15)) { text(w, dx + 18, ly, 15, k ? '#a0968a' : '#d8ccb4', 'left'); ly += 22; } ly += 6; });
+      if (it.icon) {
+        const bs = Math.min(130, listTop + listH - ly - 12), bx = dx + dw / 2, by = listTop + listH - bs / 2 - 12;
+        if (bs > 60) {
+          const rg = ctx.createRadialGradient(bx, by, 4, bx, by, bs * 0.7); rg.addColorStop(0, 'rgba(255,190,110,0.16)'); rg.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = rg; ctx.fillRect(bx - bs, by - bs / 2 - 4, bs * 2, bs + 8);
+          ctx.strokeStyle = 'rgba(138,122,88,0.35)'; ctx.strokeRect(bx - bs * 0.75 + 0.5, by - bs / 2 + 0.5, bs * 1.5, bs);
+          drawWeaponIcon(it.icon, bx, by, bs * 1.08);
+        }
+      }
     }
   }
   text('W/S wählen  ·  Enter bestätigen  ·  Esc zurück', VW / 2, y + ph - 20, 12, '#6a6258');
+}
+
+// Waffen-Bilder für das Ausrüstungsmenü (prozedural, diagonal)
+function drawWeaponIcon(id, cx, cy, size) {
+  const w = WEAPONS[id]; if (!w) return;
+  const L = size * 0.92, k = L / 100; // Bauplan in 100er-Einheiten entlang der Achse (0 = Knauf, 100 = Spitze)
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(-Math.PI / 4); ctx.translate(-L / 2, 0); ctx.scale(k, k);
+  const metal = (x0, x1, h) => { const g = ctx.createLinearGradient(0, -h, 0, h); g.addColorStop(0, '#fff'); g.addColorStop(0.35, w.col); g.addColorStop(1, '#3a3a42'); return g; };
+  const wood = '#5a4028', dark = '#1e1a16', leather = '#3a2a1c', brass = '#a08a50';
+  const haft = (x0, x1, t, c = wood) => { ctx.fillStyle = c; ctx.fillRect(x0, -t, x1 - x0, t * 2); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x0, t * 0.3, x1 - x0, t * 0.7); };
+  const grip = (x0, x1, t) => { ctx.fillStyle = leather; ctx.fillRect(x0, -t, x1 - x0, t * 2); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1; for (let x = x0 + 2; x < x1; x += 3.5) { ctx.beginPath(); ctx.moveTo(x, -t); ctx.lineTo(x + 2, t); ctx.stroke(); } };
+  const pommel = (x, r) => { ctx.fillStyle = brass; ctx.beginPath(); ctx.arc(x, 0, r, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(x - r * 0.3, -r * 0.3, r * 0.35, 0, 7); ctx.fill(); };
+  const guard = (x, h, t = 3) => { ctx.fillStyle = brass; ctx.fillRect(x - t, -h, t * 2, h * 2); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x, -h, t, h * 2); };
+  const blade = (x0, x1, h, curve = 0) => {
+    ctx.fillStyle = metal(x0, x1, h); ctx.beginPath(); ctx.moveTo(x0, -h); ctx.quadraticCurveTo((x0 + x1) / 2, -h - curve, x1 - h * 2.2, -h - curve * 0.6); ctx.lineTo(x1, -curve * 0.4); ctx.lineTo(x1 - h * 2.2, h - curve * 0.5); ctx.quadraticCurveTo((x0 + x1) / 2, h - curve, x0, h); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x0 + 2, -curve * 0.2); ctx.quadraticCurveTo((x0 + x1) / 2, -curve * 0.7, x1 - h * 3, -curve * 0.5); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x0, h * 0.95); ctx.quadraticCurveTo((x0 + x1) / 2, h - curve, x1 - h * 2.2, h * 0.9 - curve * 0.5); ctx.stroke();
+  };
+  const glowAlong = (x0, x1, rgb, a) => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.5, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},${a * 0.6})`); ctx.fillStyle = g; ctx.filter = 'blur(3px)'; ctx.beginPath(); ctx.ellipse((x0 + x1) / 2, 0, (x1 - x0) / 2, 7, 0, 0, 7); ctx.fill(); ctx.filter = 'none'; ctx.restore(); };
+  switch (id) {
+    case 'dagger': pommel(18, 4); grip(21, 38, 2.6); guard(40, 7); blade(42, 86, 4); break;
+    case 'cutlass': pommel(8, 4); grip(11, 28, 2.8); ctx.strokeStyle = brass; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(30, -6); ctx.quadraticCurveTo(18, 12, 8, 4); ctx.stroke(); guard(30, 7); blade(32, 96, 5, 9); break;
+    case 'greatsword': pommel(3, 5); grip(6, 26, 3.2); guard(28, 13, 3.5); blade(31, 100, 7.5); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(34, -1.2, 46, 2.4); break;
+    case 'ashbrand': pommel(3, 5); grip(6, 25, 3.2); guard(27, 12, 3.5); blade(30, 100, 7); ctx.strokeStyle = '#ff9a40'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(36, 2); ctx.lineTo(50, -3); ctx.lineTo(60, 2); ctx.lineTo(74, -2); ctx.lineTo(86, 1); ctx.stroke(); glowAlong(30, 100, '255,140,50', 0.45); break;
+    case 'frostblade': pommel(6, 4.5); grip(9, 27, 3); guard(29, 10); blade(32, 98, 5.5); ctx.fillStyle = 'rgba(230,250,255,0.9)'; for (const [x, y] of [[48, -6], [62, 5], [76, -5]]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 3, y * 1.7); ctx.lineTo(x + 6, y); ctx.fill(); } glowAlong(32, 98, '170,230,255', 0.4); break;
+    case 'axe': haft(4, 92, 2.8); ctx.fillStyle = dark; ctx.fillRect(4, -3.2, 10, 6.4); ctx.fillStyle = metal(70, 96, 20); ctx.beginPath(); ctx.moveTo(72, -4); ctx.quadraticCurveTo(84, -10, 82, -26); ctx.quadraticCurveTo(100, -10, 98, 4); ctx.quadraticCurveTo(100, 18, 82, 26); ctx.quadraticCurveTo(84, 10, 72, 4); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#2a2a30'; ctx.fillRect(78, -4, 6, 8); break;
+    case 'icepick': haft(10, 90, 2.6); grip(10, 32, 3); ctx.fillStyle = metal(80, 96, 12); ctx.beginPath(); ctx.moveTo(84, -4); ctx.lineTo(90, -24); ctx.lineTo(94, -4); ctx.lineTo(96, 6); ctx.lineTo(86, 12); ctx.lineTo(82, 4); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(220,240,255,0.8)'; ctx.fillRect(88, -18, 2, 10); break;
+    case 'scythe': case 'rotscythe': haft(2, 92, 2.4); ctx.fillStyle = id === 'rotscythe' ? '#4a5a30' : '#3a3a2a'; ctx.fillRect(40, -3, 6, 6);
+      ctx.fillStyle = metal(60, 96, 20); ctx.beginPath(); ctx.moveTo(90, -3); ctx.quadraticCurveTo(70, -34, 30, -30); ctx.quadraticCurveTo(66, -24, 92, 4); ctx.closePath(); ctx.fill();
+      if (id === 'rotscythe') { ctx.fillStyle = 'rgba(150,210,80,0.85)'; for (const [x, y] of [[56, -28], [70, -22], [44, -29]]) { ctx.beginPath(); ctx.arc(x, y + 4, 2, 0, 7); ctx.fill(); } glowAlong(30, 92, '150,220,80', 0.2); } break;
+    case 'spear': haft(2, 80, 2.2); ctx.fillStyle = brass; ctx.fillRect(76, -3.2, 6, 6.4); ctx.fillStyle = metal(80, 100, 7); ctx.beginPath(); ctx.moveTo(82, 0); ctx.quadraticCurveTo(88, -8, 100, 0); ctx.quadraticCurveTo(88, 8, 82, 0); ctx.fill(); ctx.fillStyle = '#7a2a1a'; ctx.beginPath(); ctx.moveTo(76, 2); ctx.lineTo(68, 10); ctx.lineTo(72, 2); ctx.fill(); break;
+    case 'trident': haft(0, 74, 2.2, '#3a4a44'); ctx.fillStyle = metal(74, 100, 14); ctx.fillRect(72, -13, 5, 26); for (const yy of [-11, 0, 11]) { ctx.beginPath(); ctx.moveTo(76, yy - 2); ctx.lineTo(yy ? 94 : 100, yy * 0.8 - 1); ctx.lineTo(yy ? 98 : 104, yy * 0.8); ctx.lineTo(yy ? 94 : 100, yy * 0.8 + 1); ctx.lineTo(76, yy + 2); ctx.fill(); } ctx.fillStyle = 'rgba(200,190,150,0.8)'; ctx.beginPath(); ctx.arc(60, 2, 2, 0, 7); ctx.arc(66, -1, 1.6, 0, 7); ctx.fill(); glowAlong(72, 104, '120,220,200', 0.25); break;
+    case 'club': grip(8, 30, 3.2); ctx.fillStyle = '#d8ccb0'; ctx.beginPath(); ctx.moveTo(30, -4); ctx.quadraticCurveTo(60, -7, 82, -12); ctx.quadraticCurveTo(100, -14, 98, 0); ctx.quadraticCurveTo(100, 14, 82, 12); ctx.quadraticCurveTo(60, 7, 30, 4); ctx.fill(); ctx.fillStyle = '#e8e0cc'; ctx.beginPath(); ctx.arc(90, -9, 7, 0, 7); ctx.arc(90, 9, 7, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(80,60,40,0.4)'; ctx.fillRect(40, 1, 40, 2); break;
+    default: pommel(6, 4.5); grip(9, 28, 3); guard(30, 10); blade(33, 98, 5); ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(36, -0.9, 40, 1.8);
+  }
+  ctx.restore();
 }
 function wrapText(str, maxW, size) {
   ctx.font = size + 'px Georgia, "Times New Roman", serif';
