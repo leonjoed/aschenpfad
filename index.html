@@ -19,7 +19,7 @@ canvas{width:960px;height:540px;outline:none;display:block;cursor:crosshair}
 <script>
 'use strict';
 // =====================================================================
-//  ASCHENPFAD – 2D Souls-like  (v0.15.1)
+//  ASCHENPFAD – 2D Souls-like  (v0.15.2)
 // =====================================================================
 const VW = 960, VH = 540, T = 32, W = 1301, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -1269,6 +1269,7 @@ function tryAction(mx) {
 }
 function updatePlayer(dt, I) {
   const p = P; p.t += dt;
+  if (opts.god) { p.st = p.maxSt; if (p.hp < p.maxHp) p.hp = p.maxHp; p.poisonT = 0; p.tox = 0; p.chillT = 0; p.cold = 0; p.breath = p.maxBreath || 7; }
   if (p.iframe > 0) p.iframe -= dt;
   if (p.poiseT > 0) { p.poiseT -= dt; if (p.poiseT <= 0) p.poise = p.poiseMax; }
   const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
@@ -1362,7 +1363,7 @@ function updateCape(dt) {
 function playerHits(a) {
   const p = P, d = a.d;
   const hb = { x: p.face > 0 ? p.x + p.w - 4 : p.x - d.reach + 4, y: p.y + p.h / 2 - d.hgt / 2 - 4, w: d.reach, h: d.hgt };
-  const dmg0 = d.dmg * p.dmgMul * (1 + 0.08 * ((world.wlevel || {})[p.weapon] || 0)), dmg = dmg0 * coopMul(false), bdmg = dmg0 * coopMul(true);
+  const dmg0 = d.dmg * p.dmgMul * (1 + 0.08 * ((world.wlevel || {})[p.weapon] || 0)) * (opts.onehit && !NET.pvp ? 99999 : 1), dmg = dmg0 * coopMul(false), bdmg = dmg0 * coopMul(true);
   if (NET.pvp && netOn() && !a.hit.has(REMOTE) && overlap(hb, REMOTE)) { a.hit.add(REMOTE); netSend({ t: 'pvphit', dmg: Math.round(dmg0 * 0.8), dir: p.face }); sparks(REMOTE.x + 11, REMOTE.y + 18, 6, '#ffd8a0'); hitstop = 0.05; }
   const G = NET.role === 'guest' && netOn();
   for (const e of enemies) { if (e.dead || a.hit.has(e)) continue; if (overlap(hb, e)) { a.hit.add(e); G ? netHitEnemy(e, dmg0, p.face, d) : hurtEnemy(e, dmg, p.face, d); } }
@@ -1374,6 +1375,7 @@ function playerHits(a) {
 // Liefert false (kein Treffer), 'parried', 'blocked' oder 'hit'
 function hitPlayer(dmg, dir, kb, src = {}) {
   if (P.remote) return remoteHit(dmg, dir, kb, src);
+  if (opts.god && !NET.pvp) { if (P.state !== 'dead') sparks(P.x + P.w / 2, P.y + 20, 3, '#ffe08a'); return false; }
   const p = P;
   if (p.state === 'dead' || gs !== 'play') return false;
   if (p.iframe > 0) return false;
@@ -1418,6 +1420,7 @@ function parrySuccess(src) {
   setState('free');
 }
 function die() {
+  if (opts.god && !NET.pvp) { P.hp = P.maxHp; P.vx = P.vy = 0; if (P.lastGround) { P.x = P.lastGround.x - P.w / 2 - P.face * 40; P.y = P.lastGround.y - P.h - 2; } setState('free'); toast('Gottmodus: gerettet', 1); return; }
   if (NET.pvp && netOn()) { netSend({ t: 'pvpWin' }); endDuel(false); return; }
   if (NET.role === 'guest' && netOn()) { P.hp = 0; setState('dead'); gs = 'dead'; deathT = 0; sfx('death'); blood(P.x + P.w / 2, P.y + 20, P.face, 30); NET.waitBoss = anyBoss(); if (NET.waitBoss) toast('Gefallen – du stehst wieder auf, wenn der Boss besiegt ist oder dein Mitspieler fällt.', 4); return; }
   P.hp = 0; setState('dead'); gs = 'dead'; deathT = 0; sfx('death');
@@ -3755,9 +3758,25 @@ function openOptions(back) {
     { label: 'Effekte', info: () => Math.round(opts.sfxVol * 100) + ' %', action: () => { opts.sfxVol = opts.sfxVol >= 1 ? 0 : Math.round((opts.sfxVol + 0.25) * 4) / 4; applyOpts(); } },
     { label: 'Grafik', info: () => opts.gfx === 'hoch' ? 'Hoch (Bloom, Nebel, viel Regen)' : 'Niedrig (schneller)', action: () => { opts.gfx = opts.gfx === 'hoch' ? 'niedrig' : 'hoch'; saveOpts(); } },
     { label: 'Bildschirmwackeln', info: () => opts.shake ? 'An' : 'Aus', action: () => { opts.shake = !opts.shake; saveOpts(); } },
+    { label: 'Code eingeben', info: () => [opts.god ? 'Unsterblich' : '', opts.onehit ? 'Ein Hieb' : ''].filter(Boolean).join(' · '), action: () => openCheat(() => openOptions(back)) },
     { label: 'Zurück', action: back },
   ] };
   openMenu(m);
+}
+// ---- Test-Codes (Optionen → Code eingeben)
+const CHEATS = {
+  ASCHENGOTT: () => { const on = !(opts.god && opts.onehit); opts.god = opts.onehit = on; return on ? 'Gottmodus + Ein Hieb aktiv' : 'Gottmodus + Ein Hieb aus'; },
+  UNSTERBLICH: () => { opts.god = !opts.god; return opts.god ? 'Unsterblich: an' : 'Unsterblich: aus'; },
+  EINHIEB: () => { opts.onehit = !opts.onehit; return opts.onehit ? 'Ein Hieb: an' : 'Ein Hieb: aus'; },
+  SEELENREGEN: () => { P0.souls += 100000; return '+100 000 Seelen'; },
+  AUS: () => { opts.god = opts.onehit = false; return 'Alle Codes aus'; },
+};
+function openCheat(back) {
+  netUI({ title: 'Code eingeben', text: 'Test-Codes für Entwickler:', input: 'Code', btn: 'Bestätigen', onBtn: v => {
+    const f = CHEATS[v.toUpperCase().replace(/[^A-Z]/g, '')];
+    if (!f) { netUI(Object.assign({}, NET.ui, { err: 'Unbekannter Code.' })); return; }
+    const msg = f(); saveOpts(); netUI(null); toast(msg, 2.5); sfx('level'); if (back) back();
+  } });
 }
 function openControls(back) { openMenu({ title: 'Steuerung', style: 'controls', back, items: [{ label: 'Zurück', action: back }] }); }
 function openPause() {
@@ -4763,6 +4782,7 @@ function bar(x, y, w, h, v, trail, c1, c2) {
 }
 function drawHUD() {
   ctx = sctx; ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (opts.god || opts.onehit) text([opts.god ? 'UNSTERBLICH' : '', opts.onehit ? 'EIN HIEB' : ''].filter(Boolean).join(' · '), VW / 2, 18, 11, '#ffd27a', 'center', undefined, 3);
   bar(26, 22, P.maxHp * 2, 11, P.hp / P.maxHp, P.hpShow / P.maxHp, '#b02424', '#5a0e0e');
   bar(26, 41, P.maxSt * 2, 7, P.st / P.maxSt, null, P.st < 20 ? '#6a7a3a' : '#4a9a52', '#1e4a24');
   if (P.poisonT > 0) text('VERGIFTET', 26 + P.maxSt * 2 + 14, 44, 12, Math.sin(time * 6) > 0 ? '#9aff6a' : '#5aaa3a', 'left', undefined, 2);
@@ -4822,7 +4842,7 @@ function drawMenu() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     ctx.save(); ctx.shadowColor = 'rgba(255,150,60,0.55)'; ctx.shadowBlur = 24;
     text('ASCHENPFAD', 96, 150, 66, '#e8d8b0', 'left', undefined, 6); ctx.restore();
-    text('Ein 2D-Souls-Prototyp  ·  v0.15.1', 100, 200, 16, '#8a8070', 'left', undefined, 2);
+    text('Ein 2D-Souls-Prototyp  ·  v0.15.2', 100, 200, 16, '#8a8070', 'left', undefined, 2);
     m.items.forEach((it, i) => {
       const y = 258 + i * 38, sel = i === m.sel;
       const col = it.disabled ? '#45403a' : sel ? '#ffd27a' : '#cfc6b6';
