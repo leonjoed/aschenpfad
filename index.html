@@ -19,7 +19,7 @@ canvas{width:960px;height:540px;outline:none;display:block;cursor:crosshair}
 <script>
 'use strict';
 // =====================================================================
-//  ASCHENPFAD – 2D Souls-like  (v0.13)
+//  ASCHENPFAD – 2D Souls-like  (v0.13.1)
 // =====================================================================
 const VW = 960, VH = 540, T = 32, W = 1301, H = 17, G = 1900, STEP = 1 / 60, AG = 500;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -3191,11 +3191,12 @@ function myState() {
 }
 function netTick(dt) {
   if (!NET.role) return;
+  if (NET.ws && NET.role === 'host' && NET.ws.readyState === 1 && !NET.paired) { NET.infoT2 = (NET.infoT2 || 0) - dt; if (NET.infoT2 <= 0) { NET.infoT2 = 5; NET.ws.send(JSON.stringify({ sys: 'info', info: hostInfo() })); } }
   if (!netOn()) return;
   NET.stT -= dt; if (NET.stT <= 0) { NET.stT = 1 / 20; netSend(myState()); }
   if (NET.role === 'host') {
     NET.snapT -= dt; if (NET.snapT <= 0) { NET.snapT = 1 / 15; netSend(snapshot()); }
-    NET.worldT -= dt; if (NET.worldT <= 0) { NET.worldT = 1; const w = worldMsg(), k = JSON.stringify(w); if (k !== NET.worldKey) { NET.worldKey = k; netSend(w); } }
+    NET.worldT -= dt; if (NET.worldT <= 0) { NET.worldT = 1; if (NET.ws && NET.ws.readyState === 1 && (NET.infoT = (NET.infoT || 0) + 1) % 5 === 0) NET.ws.send(JSON.stringify({ sys: 'info', info: hostInfo() })); const w = worldMsg(), k = JSON.stringify(w); if (k !== NET.worldKey) { NET.worldKey = k; netSend(w); } }
     if (Math.abs(P0.x - NET.lastX) > 500 && gs === 'play') netSend({ t: 'tp', x: P0.x, y: P0.y });
     NET.lastX = P0.x;
   }
@@ -3332,8 +3333,9 @@ function serverHost(ws, tries = 0) {
     else if (m.sys === 'paired') { NET.paired = true; NET.connected = true; netUI(null); toast('Mitspieler verbunden!', 3); }
     else if (m.sys === 'left') { NET.paired = false; NET.connected = false; NET.pvp = false; REMOTE.alive = false; toast('Der Mitspieler hat das Spiel verlassen. Der Raum bleibt offen.', 3.5); }
   });
-  ws.send(JSON.stringify({ sys: 'host', code }));
+  ws.send(JSON.stringify({ sys: 'host', code, info: hostInfo() }));
 }
+function hostInfo() { const bf = BONFIRES[world.bonfire] || {}; return { name: (opts.pname || '').trim(), lvl: level(), place: bf.name || '' }; }
 function serverJoin(ws, code, retry) {
   useWS(ws, m => {
     if (m.sys === 'paired') { NET.paired = true; NET.connected = true; netUI(null); toast('Verbunden – du bist in der Welt des Hosts', 3); netSend({ t: 'hello' }); }
@@ -3341,6 +3343,27 @@ function serverJoin(ws, code, retry) {
     else if (m.sys === 'left') netClose('Der Host hat das Spiel beendet.');
   });
   ws.send(JSON.stringify({ sys: 'join', code }));
+}
+
+// ---- Spielbrowser (nur mit eigenem Server): offene Spiele auflisten und mit einem Klick beitreten
+async function netBrowse() {
+  netClose(); NET.role = 'guest';
+  netUI({ title: 'Offene Spiele', text: 'Suche Spiele …' });
+  const ws = await openWS();
+  if (!ws) { netJoin(); return; }
+  NET.ws = ws;
+  const join = code => { clearInterval(NET.browseT); NET.browseT = null; netUI({ title: 'Spiel beitreten', text: 'Verbinde mit ' + code + ' …' }); serverJoin(ws, code, v => { const c = v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16); if (c) join(c); }); };
+  ws.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.sys !== 'rooms' || !NET.browseT) return;
+    const open = m.list.filter(r => !r.full), key = JSON.stringify(open); if (key === NET.lastList) return; NET.lastList = key;
+    netUI({ title: 'Offene Spiele', text: open.length ? 'Tippe auf ein Spiel, um beizutreten:' : 'Gerade hostet niemand ein Spiel. Die Liste aktualisiert sich automatisch.',
+      list: open.map(r => ({ label: (r.name || 'Aschenträger') + '  ·  Stufe ' + r.lvl, sub: (r.place || '') + '  ·  Code ' + r.code, onClick: () => join(r.code) })),
+      input: 'oder Code eingeben', btn: 'Beitreten', onBtn: v => { const c = v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16); if (c) join(c); }, keepInput: true });
+  };
+  ws.onclose = () => { clearInterval(NET.browseT); NET.browseT = null; if (NET.ws === ws) NET.ws = null; };
+  const ask = () => { if (ws.readyState === 1) ws.send(JSON.stringify({ sys: 'list' })); };
+  NET.lastList = null; NET.browseT = setInterval(ask, 2000); ask();
 }
 async function netHost(tries = 0) {
   netClose(); NET.role = 'host';
@@ -3392,6 +3415,7 @@ function netClose(msg) {
 // ---- HTML-Fenster für die Codes
 function netUI(o) {
   let el = document.getElementById('netui');
+  const oldIn = document.getElementById('netin'), prevIn = o && o.keepInput && oldIn ? oldIn.value : '', hadFocus = oldIn && document.activeElement === oldIn;
   NET.ui = o;
   if (!o) { if (el) el.remove(); return; }
   if (!el) {
@@ -3406,20 +3430,23 @@ function netUI(o) {
     <div style="white-space:pre-line;font-size:14px;line-height:1.5;color:#cfc6b6;margin-bottom:10px">${o.text || ''}</div>
     ${o.big ? `<div style="font:bold 46px monospace;letter-spacing:10px;color:#ffd27a;text-align:center;margin:6px 0 10px;user-select:all">${o.big}</div>` + btn('netcopy', 'Code kopieren', true) : ''}
     ${o.sub ? `<div style="font-size:13px;color:#a0968a;margin-top:10px;line-height:1.5">${o.sub}</div>` : ''}
+    ${o.list ? '<div style="max-height:42vh;overflow:auto;margin:4px 0 6px">' + o.list.map((r, i) => `<button data-li="${i}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:12px 14px;border-radius:8px;border:1px solid #8a7a58;background:#211c22;color:#ffd8a0;font:17px Georgia,serif">${r.label}<div style="font-size:13px;color:#a0968a;margin-top:3px">${r.sub || ''}</div></button>`).join('') + '</div>' : ''}
     ${o.code ? `<div style="font:15px monospace;color:#ffd8a0;background:#120f14;border:1px solid #5e5240;border-radius:6px;padding:10px;word-break:break-all;user-select:all">${o.code}</div>` + btn('netcopy', 'Adresse kopieren', true) + (o.link ? `<a href="${o.link}" target="_blank" rel="noopener" style="display:inline-block;margin:6px 0 0;padding:10px 16px;font:15px Georgia,serif;border-radius:6px;border:1px solid #8a7a58;background:#211c22;color:#ffd8a0;text-decoration:none">Öffnen</a>` : '') : ''}
     ${o.input ? '<div style="margin-top:10px"></div>' + `<input id="netin" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${o.input}" style="width:100%;background:#120f14;color:#ffd27a;border:1px solid #5e5240;border-radius:6px;padding:12px;font:bold 26px monospace;letter-spacing:6px;text-transform:uppercase;text-align:center;box-sizing:border-box">` + btn('netgo', o.btn, true) : ''}
     ${o.err ? `<div style="color:#ff8a6a;margin-top:8px">${o.err}</div>` : ''}
     <div style="text-align:right">${btn('netx', NET.connected ? 'Schließen' : 'Abbrechen')}</div></div>`;
   const $ = id => document.getElementById(id);
   if ($('netcopy')) $('netcopy').onclick = async () => { try { await navigator.clipboard.writeText(o.big || o.code); $('netcopy').textContent = 'Kopiert ✓'; } catch (e) {} };
-  if ($('netgo')) { const go = () => { const v = $('netin').value.trim(); if (v) o.onBtn(v); }; $('netgo').onclick = go; $('netin').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') go(); }; setTimeout(() => $('netin') && $('netin').focus(), 50); }
-  $('netx').onclick = () => { netUI(null); if (!NET.connected) netClose(); };
+  if ($('netgo')) { const go = () => { const v = $('netin').value.trim(); if (v) o.onBtn(v); }; $('netgo').onclick = go; $('netin').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') go(); }; if (!o.list) setTimeout(() => $('netin') && $('netin').focus(), 50); }
+  el.querySelectorAll('[data-li]').forEach(b => { b.onclick = () => o.list[+b.dataset.li].onClick(); });
+  if (prevIn && $('netin')) { $('netin').value = prevIn; if (hadFocus) $('netin').focus(); }
+  $('netx').onclick = () => { netUI(null); clearInterval(NET.browseT); NET.browseT = null; if (!NET.connected) netClose(); };
   el.onkeydown = e => e.stopPropagation(); el.onkeyup = e => e.stopPropagation();
 }
 function openNetMenu(back, inGame) {
   openMenu({ title: 'Mehrspieler', sub: 'Host nennt einen kurzen Raum-Code, der Mitspieler gibt ihn ein', style: 'panel', back, items: [
     { label: 'Spiel hosten', info: 'deine Welt, dein Spielstand', action: () => { if (inGame) { closeMenu(); } else { const l = lastSlot(); if (l >= 0) loadSlot(l); else startNew(0); } netHost(); } },
-    { label: 'Beitreten', info: 'mit deinem Charakter', action: () => { if (inGame) { save(); closeMenu(); } else { const l = lastSlot(); if (l >= 0) loadSlot(l); else startNew(0); } NET.guestBase = JSON.parse(localStorage.getItem(SLOT_KEY(slot)) || 'null'); netJoin(); } },
+    { label: 'Beitreten', info: 'mit deinem Charakter', action: () => { if (inGame) { save(); closeMenu(); } else { const l = lastSlot(); if (l >= 0) loadSlot(l); else startNew(0); } NET.guestBase = JSON.parse(localStorage.getItem(SLOT_KEY(slot)) || 'null'); netBrowse(); } },
     ...(NET.role ? [{ label: 'Verbindung trennen', action: () => { netClose('Getrennt.'); closeMenu(); } }] : []),
     { label: 'Zurück', action: back },
   ] });
@@ -4710,7 +4737,7 @@ function drawMenu() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     ctx.save(); ctx.shadowColor = 'rgba(255,150,60,0.55)'; ctx.shadowBlur = 24;
     text('ASCHENPFAD', 96, 150, 66, '#e8d8b0', 'left', undefined, 6); ctx.restore();
-    text('Ein 2D-Souls-Prototyp  ·  v0.13', 100, 200, 16, '#8a8070', 'left', undefined, 2);
+    text('Ein 2D-Souls-Prototyp  ·  v0.13.1', 100, 200, 16, '#8a8070', 'left', undefined, 2);
     ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(10, 496, 940, 40);
     text('Controller-Test: ' + (padDiag || 'noch nicht abgefragt'), 20, 512, 13, '#e8dcc0', 'left'); text('Letzte Taste: ' + lastKey + '  ·  Permissions-Policy gamepad: ' + (document.featurePolicy ? String(document.featurePolicy.allowsFeature('gamepad')) : '?'), 20, 529, 13, '#e8dcc0', 'left');
     m.items.forEach((it, i) => {

@@ -4,7 +4,8 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const PORT = +process.env.PORT || 8080;
 const GAME = process.env.GAME_FILE || path.join(__dirname, 'index.html');
-const rooms = new Map();           // Code -> { host, guest }
+const rooms = new Map();           // Code -> { host, guest, info }
+const roomList = () => [...rooms.entries()].map(([code, r]) => ({ code, full: !!r.guest, ...r.info }));
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 const server = http.createServer((req, res) => {
@@ -14,6 +15,8 @@ const server = http.createServer((req, res) => {
       if (err) { res.writeHead(500); res.end('index.html fehlt'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(data);
     });
+  } else if (url === '/rooms') {
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(roomList()));
   } else if (url === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, rooms: rooms.size }));
   } else { res.writeHead(404); res.end('Nicht gefunden'); }
@@ -67,7 +70,11 @@ function onMessage(c, msg) {
     const code = String(m.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
     if (m.sys === 'host') {
       if (!code || rooms.has(code)) { sendJSON(c, { sys: 'err', why: 'taken' }); return; }
-      rooms.set(code, { host: c, guest: null }); c.room = code; c.role = 'host'; sendJSON(c, { sys: 'hosting', code }); log('Raum', code, 'eröffnet');
+      rooms.set(code, { host: c, guest: null, info: cleanInfo(m.info) }); c.room = code; c.role = 'host'; sendJSON(c, { sys: 'hosting', code }); log('Raum', code, 'eröffnet');
+    } else if (m.sys === 'info') {
+      const r = c.role === 'host' && rooms.get(c.room); if (r) r.info = cleanInfo(m.info);
+    } else if (m.sys === 'list') {
+      sendJSON(c, { sys: 'rooms', list: roomList() });
     } else if (m.sys === 'join') {
       const r = rooms.get(code);
       if (!r) { sendJSON(c, { sys: 'err', why: 'nohost' }); return; }
@@ -79,6 +86,10 @@ function onMessage(c, msg) {
   const r = c.room && rooms.get(c.room); if (!r) return;
   const other = c.role === 'host' ? r.guest : r.host;
   if (other) sendFrame(other.sock, msg);                                // Spieldaten 1:1 weiterreichen
+}
+function cleanInfo(i) {
+  i = i || {}; const str = (v, n) => String(v == null ? '' : v).replace(/[<>&"]/g, '').slice(0, n);
+  return { name: str(i.name, 20), lvl: Math.max(0, Math.min(999, +i.lvl || 0)), place: str(i.place, 40), act: str(i.act, 50), since: i.since || Date.now() };
 }
 function leave(c) {
   if (!c.room) return;

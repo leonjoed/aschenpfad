@@ -64,3 +64,4 @@ Jede Version ist ein eigener Commit, die Versionsnummer steht am Anfang der Comm
 | v0.11 | Mehrspieler im WLAN (WebRTC, Verbindung per Code): Koop durch alle Welten, Duell in der Zuflucht |
 | v0.12 | Mehrspieler mit kurzem 6-stelligem Raum-Code (nur der Gast gibt ihn ein) |
 | v0.13 | Eigener Mehrspieler-Server als Docker-Container (WebSocket, funktioniert in jedem LAN) |
+| v0.13.1 | Spielbrowser: offene Spiele auf dem eigenen Server auflisten und per Klick beitreten |
